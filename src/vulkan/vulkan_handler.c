@@ -321,6 +321,16 @@ static int try_create_render_pass(struct vulkan_handler *this) {
 	subpass_description.pPreserveAttachments = 0;
 	subpass_description.pDepthStencilAttachment = 0;
 
+	//TODO dependency experimental
+	VkSubpassDependency dependency;
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency.dstSubpass = 0;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcAccessMask = 0;
+	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependency.dependencyFlags = 0;
+
 	VkRenderPassCreateInfo create_info;
 	create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	create_info.flags = 0;
@@ -329,8 +339,8 @@ static int try_create_render_pass(struct vulkan_handler *this) {
 	create_info.pAttachments = &attachment_description;
 	create_info.subpassCount = 1;
 	create_info.pSubpasses = &subpass_description;
-	create_info.dependencyCount = 0;
-	create_info.pDependencies = 0;
+	create_info.dependencyCount = 1;
+	create_info.pDependencies = &dependency;
 
 	if (vkCreateRenderPass(this->device, &create_info, 0, &this->render_pass) != VK_SUCCESS) {
 		return -1;
