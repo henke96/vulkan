@@ -16,6 +16,7 @@ struct vulkan_handler {
 	VkRenderPass render_pass;
 	VkPipelineLayout pipeline_layout;
 	VkPipeline graphics_pipeline;
+	VkFramebuffer *swapchain_framebuffers;
 	int window_width;
 	int window_height;
 #ifdef VULKAN_HANDLER_VALIDATION

@@ -66,7 +66,7 @@ static int try_init_device(struct vulkan_handler *this) {
 	int queue_family_index = -1;
 	uint32_t device_count;
 	vkEnumeratePhysicalDevices(this->instance, &device_count, 0);
-	VkPhysicalDevice *devices = malloc(device_count * sizeof(*devices));
+	VkPhysicalDevice *devices = malloc(device_count*sizeof(*devices));
 	if (devices == 0) {
 		return -3;
 	}
@@ -75,8 +75,10 @@ static int try_init_device(struct vulkan_handler *this) {
 		VkPhysicalDevice current_device = devices[i];
 		uint32_t queue_family_count = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(current_device, &queue_family_count, 0);
-		VkQueueFamilyProperties *queue_family_propertiess = malloc(queue_family_count * sizeof(*queue_family_propertiess));
+		VkQueueFamilyProperties *queue_family_propertiess = malloc(queue_family_count*sizeof(*queue_family_propertiess));
 		if (queue_family_propertiess == 0) {
+			free(devices);
+			free(queue_family_propertiess);
 			return -4;
 		}
 		vkGetPhysicalDeviceQueueFamilyProperties(current_device, &queue_family_count, queue_family_propertiess);
@@ -166,7 +168,7 @@ static int try_create_swapchain(struct vulkan_handler *this) {
 	}
 
 	vkGetSwapchainImagesKHR(this->device, this->swapchain, &this->swapchain_image_count, 0);
-	this->swapchain_images = (VkImage *) malloc(this->swapchain_image_count*sizeof(VkImage));
+	this->swapchain_images = malloc(this->swapchain_image_count*sizeof(*this->swapchain_images));
 	if (!this->swapchain_images) {
 		return -2;
 	}
@@ -175,7 +177,7 @@ static int try_create_swapchain(struct vulkan_handler *this) {
 }
 
 static int try_create_image_views(struct vulkan_handler *this) {
-	this->swapchain_imageviews = (VkImageView *) malloc(this->swapchain_image_count*sizeof(VkImageView));
+	this->swapchain_imageviews = malloc(this->swapchain_image_count*sizeof(*this->swapchain_imageviews));
 	if (!this->swapchain_imageviews) {
 		return -1;
 	}
@@ -199,6 +201,7 @@ static int try_create_image_views(struct vulkan_handler *this) {
 		create_info.subresourceRange.layerCount = 1;
 
 		if (vkCreateImageView(this->device, &create_info, 0, this->swapchain_imageviews + i) != VK_SUCCESS) {
+			free(this->swapchain_imageviews);
 			return -2;
 		}
 	}
@@ -271,14 +274,19 @@ static int try_create_graphics_pipeline(struct vulkan_handler *this) {
 	}
 	struct file__read frag_shader_code = file__read("shaders/frag.spv");
 	if (frag_shader_code.result < 0) {
+		free(vert_shader_code.malloc_bytes);
 		return -2;
 	}
 	VkShaderModule vert_shader_module;
 	if (try_create_shader_module(this, vert_shader_code.malloc_bytes, vert_shader_code.length, &vert_shader_module) < 0) {
+		free(vert_shader_code.malloc_bytes);
+		free(frag_shader_code.malloc_bytes);
 		return -3;
 	}
 	VkShaderModule frag_shader_module;
 	if (try_create_shader_module(this, frag_shader_code.malloc_bytes, frag_shader_code.length, &frag_shader_module) < 0) {
+		free(vert_shader_code.malloc_bytes);
+		free(frag_shader_code.malloc_bytes);
 		return -4;
 	}
 
@@ -402,6 +410,8 @@ static int try_create_graphics_pipeline(struct vulkan_handler *this) {
 	pipeline_layout_create_info.flags = 0;
 
 	if (vkCreatePipelineLayout(this->device, &pipeline_layout_create_info, 0, &this->pipeline_layout) != VK_SUCCESS) {
+		free(vert_shader_code.malloc_bytes);
+		free(frag_shader_code.malloc_bytes);
 		return -5;
 	}
 
@@ -427,6 +437,8 @@ static int try_create_graphics_pipeline(struct vulkan_handler *this) {
 	pipeline_create_info.pTessellationState = 0;
 
 	if (vkCreateGraphicsPipelines(this->device, VK_NULL_HANDLE, 1, &pipeline_create_info, 0, &this->graphics_pipeline) != VK_SUCCESS) {
+		free(vert_shader_code.malloc_bytes);
+		free(frag_shader_code.malloc_bytes);
 		return -6;
 	}
 
@@ -438,7 +450,36 @@ static int try_create_graphics_pipeline(struct vulkan_handler *this) {
 	return 0;
 }
 
+static int try_create_framebuffers(struct vulkan_handler *this) {
+	this->swapchain_framebuffers = malloc(this->swapchain_image_count*sizeof(*this->swapchain_framebuffers));
+	if (!this->swapchain_framebuffers) {
+		return -1;
+	}
+
+	for (int i = 0; i < this->swapchain_image_count; ++i) {
+		VkFramebufferCreateInfo create_info;
+		create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		create_info.renderPass = this->render_pass;
+		create_info.attachmentCount = 1;
+		create_info.pAttachments = (this->swapchain_imageviews + i);
+		create_info.width = this->swapchain_extent.width;
+		create_info.height = this->swapchain_extent.height;
+		create_info.layers = 1;
+		create_info.flags = 0;
+		create_info.pNext = 0;
+
+		if (vkCreateFramebuffer(this->device, &create_info, 0, this->swapchain_framebuffers + i) != VK_SUCCESS) {
+			free(this->swapchain_framebuffers);
+			return -2;
+		}
+	}
+	return 0;
+}
+
 void vulkan_handler__free(struct vulkan_handler *this) {
+	for (int i = 0; i < this->swapchain_image_count; ++i) {
+		vkDestroyFramebuffer(this->device, this->swapchain_framebuffers[i], 0);
+	}
 	vkDestroyPipeline(this->device, this->graphics_pipeline, 0);
 	vkDestroyPipelineLayout(this->device, this->pipeline_layout, 0);
 	vkDestroyRenderPass(this->device, this->render_pass, 0);
@@ -453,6 +494,10 @@ void vulkan_handler__free(struct vulkan_handler *this) {
 	func(this->instance, this->callback, 0);
 #endif
 	vkDestroyInstance(this->instance, 0);
+
+	free(this->swapchain_framebuffers);
+	free(this->swapchain_imageviews);
+	free(this->swapchain_images);
 }
 
 int vulkan_handler__try_init(struct vulkan_handler *this, const char **extensions, int extension_count, int window_width, int window_height, VkResult (*create_window_surface)(void *, VkInstance, VkSurfaceKHR *), void *surface_creator) {
