@@ -7,6 +7,7 @@ struct vulkan_handler {
 	VkPhysicalDevice physical_device;
 	VkDevice device;
 	VkQueue queue;
+	int queue_family_index;
 	VkSurfaceKHR surface;
 	VkSwapchainKHR swapchain;
 	VkExtent2D swapchain_extent;
@@ -17,6 +18,8 @@ struct vulkan_handler {
 	VkPipelineLayout pipeline_layout;
 	VkPipeline graphics_pipeline;
 	VkFramebuffer *swapchain_framebuffers;
+	VkCommandPool command_pool;
+	VkCommandBuffer *swapchain_command_buffers;
 	int window_width;
 	int window_height;
 #ifdef VULKAN_HANDLER_VALIDATION

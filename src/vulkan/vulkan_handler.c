@@ -6,6 +6,77 @@
 #define SWAPCHAIN_FORMAT VK_FORMAT_B8G8R8A8_UNORM
 #define PIPELINE_SAMPLES VK_SAMPLE_COUNT_1_BIT
 
+static void free_from_instance(struct vulkan_handler *this) {
+	vkDestroyInstance(this->instance, 0);
+}
+
+#ifdef VULKAN_HANDLER_VALIDATION
+static void free_from_debug_callback(struct vulkan_handler *this) {
+	PFN_vkDestroyDebugUtilsMessengerEXT func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(this->instance, "vkDestroyDebugUtilsMessengerEXT");
+	func(this->instance, this->callback, 0);
+	free_from_instance(this);
+}
+#endif
+
+static void free_from_window_surface(struct vulkan_handler *this) {
+	vkDestroySurfaceKHR(this->instance, this->surface, 0);
+#ifdef VULKAN_HANDLER_VALIDATION
+	free_from_debug_callback(this);
+#endif
+}
+
+static void free_from_device(struct vulkan_handler *this) {
+	vkDestroyDevice(this->device, 0);
+	free_from_window_surface(this);
+}
+
+static void free_from_swapchain(struct vulkan_handler *this) {
+	vkDestroySwapchainKHR(this->device, this->swapchain, 0);
+	free(this->swapchain_images);
+	free_from_device(this);
+}
+
+static void free_from_image_views(struct vulkan_handler *this) {
+	for (int i = 0; i < this->swapchain_image_count; ++i) {
+		vkDestroyImageView(this->device, this->swapchain_imageviews[i], 0);
+	}
+	free(this->swapchain_imageviews);
+	free_from_swapchain(this);
+}
+
+static void free_from_render_pass(struct vulkan_handler *this) {
+	vkDestroyRenderPass(this->device, this->render_pass, 0);
+	free_from_image_views(this);
+}
+
+static void free_from_graphics_pipeline(struct vulkan_handler *this) {
+	vkDestroyPipeline(this->device, this->graphics_pipeline, 0);
+	vkDestroyPipelineLayout(this->device, this->pipeline_layout, 0);
+	free_from_render_pass(this);
+}
+
+static void free_from_framebuffers(struct vulkan_handler *this) {
+	for (int i = 0; i < this->swapchain_image_count; ++i) {
+		vkDestroyFramebuffer(this->device, this->swapchain_framebuffers[i], 0);
+	}
+	free(this->swapchain_framebuffers);
+	free_from_graphics_pipeline(this);
+}
+
+static void free_from_command_pool(struct vulkan_handler *this) {
+	vkDestroyCommandPool(this->device, this->command_pool, 0);
+	free_from_framebuffers(this);
+}
+
+static void free_from_command_buffers(struct vulkan_handler *this) {
+	free(this->swapchain_command_buffers);
+	free_from_command_pool(this);
+}
+
+void vulkan_handler__free(struct vulkan_handler *this) {
+	free_from_command_buffers(this);
+}
+
 static int try_create_instance(struct vulkan_handler *this, const char **extensions, int extension_count) {
 	VkApplicationInfo app_info;
 	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -62,8 +133,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 }
 #endif
 
-static int try_init_device(struct vulkan_handler *this) {
-	int queue_family_index = -1;
+static int try_create_device(struct vulkan_handler *this) {
+	this->queue_family_index = -1;
 	uint32_t device_count;
 	vkEnumeratePhysicalDevices(this->instance, &device_count, 0);
 	VkPhysicalDevice *devices = malloc(device_count*sizeof(*devices));
@@ -89,7 +160,7 @@ static int try_init_device(struct vulkan_handler *this) {
 			vkGetPhysicalDeviceSurfaceSupportKHR(current_device, j, this->surface, &present_support);
 
 			if (queue_family_properties->queueCount > 0 && queue_family_properties->queueFlags & VK_QUEUE_GRAPHICS_BIT && present_support) {
-				queue_family_index = j;
+				this->queue_family_index = j;
 				this->physical_device = current_device;
 				free(queue_family_propertiess);
 				goto device_search_done;
@@ -99,7 +170,7 @@ static int try_init_device(struct vulkan_handler *this) {
 	}
 	device_search_done:
 	free(devices);
-	if (queue_family_index == -1) {
+	if (this->queue_family_index == -1) {
 		return -5;
 	}
 
@@ -110,7 +181,7 @@ static int try_init_device(struct vulkan_handler *this) {
 	const float queue_priority = 1.0f;
 	queue_create_info.pQueuePriorities = &queue_priority;
 	queue_create_info.queueCount = 1;
-	queue_create_info.queueFamilyIndex = queue_family_index;
+	queue_create_info.queueFamilyIndex = this->queue_family_index;
 
 	VkPhysicalDeviceFeatures device_features = {0};
 
@@ -136,7 +207,7 @@ static int try_init_device(struct vulkan_handler *this) {
 	if (vkCreateDevice(this->physical_device, &device_create_info, 0, &this->device) != VK_SUCCESS) {
 		return -1;
 	}
-	vkGetDeviceQueue(this->device, queue_family_index, 0, &this->queue);
+	vkGetDeviceQueue(this->device, this->queue_family_index, 0, &this->queue);
 	return 0;
 }
 
@@ -285,6 +356,7 @@ static int try_create_graphics_pipeline(struct vulkan_handler *this) {
 	}
 	VkShaderModule frag_shader_module;
 	if (try_create_shader_module(this, frag_shader_code.malloc_bytes, frag_shader_code.length, &frag_shader_module) < 0) {
+		vkDestroyShaderModule(this->device, vert_shader_module, 0);
 		free(vert_shader_code.malloc_bytes);
 		free(frag_shader_code.malloc_bytes);
 		return -4;
@@ -410,6 +482,8 @@ static int try_create_graphics_pipeline(struct vulkan_handler *this) {
 	pipeline_layout_create_info.flags = 0;
 
 	if (vkCreatePipelineLayout(this->device, &pipeline_layout_create_info, 0, &this->pipeline_layout) != VK_SUCCESS) {
+		vkDestroyShaderModule(this->device, vert_shader_module, 0);
+		vkDestroyShaderModule(this->device, frag_shader_module, 0);
 		free(vert_shader_code.malloc_bytes);
 		free(frag_shader_code.malloc_bytes);
 		return -5;
@@ -437,6 +511,9 @@ static int try_create_graphics_pipeline(struct vulkan_handler *this) {
 	pipeline_create_info.pTessellationState = 0;
 
 	if (vkCreateGraphicsPipelines(this->device, VK_NULL_HANDLE, 1, &pipeline_create_info, 0, &this->graphics_pipeline) != VK_SUCCESS) {
+		vkDestroyPipelineLayout(this->device, this->pipeline_layout, 0);
+		vkDestroyShaderModule(this->device, vert_shader_module, 0);
+		vkDestroyShaderModule(this->device, frag_shader_module, 0);
 		free(vert_shader_code.malloc_bytes);
 		free(frag_shader_code.malloc_bytes);
 		return -6;
@@ -444,7 +521,6 @@ static int try_create_graphics_pipeline(struct vulkan_handler *this) {
 
 	vkDestroyShaderModule(this->device, vert_shader_module, 0);
 	vkDestroyShaderModule(this->device, frag_shader_module, 0);
-
 	free(vert_shader_code.malloc_bytes);
 	free(frag_shader_code.malloc_bytes);
 	return 0;
@@ -476,35 +552,44 @@ static int try_create_framebuffers(struct vulkan_handler *this) {
 	return 0;
 }
 
-void vulkan_handler__free(struct vulkan_handler *this) {
-	for (int i = 0; i < this->swapchain_image_count; ++i) {
-		vkDestroyFramebuffer(this->device, this->swapchain_framebuffers[i], 0);
-	}
-	vkDestroyPipeline(this->device, this->graphics_pipeline, 0);
-	vkDestroyPipelineLayout(this->device, this->pipeline_layout, 0);
-	vkDestroyRenderPass(this->device, this->render_pass, 0);
-	for (int i = 0; i < this->swapchain_image_count; ++i) {
-		vkDestroyImageView(this->device, this->swapchain_imageviews[i], 0);
-	}
-	vkDestroySwapchainKHR(this->device, this->swapchain, 0);
-	vkDestroyDevice(this->device, 0);
-	vkDestroySurfaceKHR(this->instance, this->surface, 0);
-#ifdef VULKAN_HANDLER_VALIDATION
-	PFN_vkDestroyDebugUtilsMessengerEXT func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(this->instance, "vkDestroyDebugUtilsMessengerEXT");
-	func(this->instance, this->callback, 0);
-#endif
-	vkDestroyInstance(this->instance, 0);
+static int try_create_command_pool(struct vulkan_handler *this) {
+	VkCommandPoolCreateInfo create_info;
+	create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	create_info.pNext = 0;
+	create_info.flags = 0;
+	create_info.queueFamilyIndex = this->queue_family_index;
 
-	free(this->swapchain_framebuffers);
-	free(this->swapchain_imageviews);
-	free(this->swapchain_images);
+	if (vkCreateCommandPool(this->device, &create_info, 0, &this->command_pool) != VK_SUCCESS) {
+		return -1;
+	}
+	return 0;
+}
+
+static int try_create_command_buffers(struct vulkan_handler *this) {
+	this->swapchain_command_buffers = malloc(this->swapchain_image_count*sizeof(*this->swapchain_command_buffers));
+	if (!this->swapchain_command_buffers) {
+		return -1;
+	}
+
+	VkCommandBufferAllocateInfo allocate_info;
+	allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocate_info.commandPool = this->command_pool;
+	allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocate_info.commandBufferCount = this->swapchain_image_count;
+	allocate_info.pNext = 0;
+
+	if (vkAllocateCommandBuffers(this->device, &allocate_info, this->swapchain_command_buffers) != VK_SUCCESS) {
+		free(this->swapchain_command_buffers);
+		return -2;
+	}
+	return 0;
 }
 
 int vulkan_handler__try_init(struct vulkan_handler *this, const char **extensions, int extension_count, int window_width, int window_height, VkResult (*create_window_surface)(void *, VkInstance, VkSurfaceKHR *), void *surface_creator) {
 	this->window_width = window_width;
 	this->window_height = window_height;
-	int result;
 
+	int result;
 	result = try_create_instance(this, extensions, extension_count);
 	if (result < 0) {
 		return -1;
@@ -521,37 +606,65 @@ int vulkan_handler__try_init(struct vulkan_handler *this, const char **extension
 
 	PFN_vkCreateDebugUtilsMessengerEXT func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(this->instance, "vkCreateDebugUtilsMessengerEXT");
 	if (func(this->instance, &create_info, 0, &this->callback) != VK_SUCCESS) {
+		free_from_instance(this);
 		return -2;
 	}
 #endif
-	result = create_window_surface(surface_creator, this->instance, &this->surface);
-	if (result != VK_SUCCESS) {
+	if (create_window_surface(surface_creator, this->instance, &this->surface) != VK_SUCCESS) {
+#ifdef VULKAN_HANDLER_VALIDATION
+		free_from_debug_callback(this);
+#else
+		free_from_instance(this);
+#endif
 		return -3;
 	}
 
-	result = try_init_device(this);
+	result = try_create_device(this);
 	if (result < 0) {
+		free_from_window_surface(this);
 		return -4;
 	}
 
 	result = try_create_swapchain(this);
 	if (result < 0) {
+		free_from_device(this);
 		return -5;
 	}
 
 	result = try_create_image_views(this);
 	if (result < 0) {
+		free_from_swapchain(this);
 		return -6;
 	}
 
 	result = try_create_render_pass(this);
 	if (result < 0) {
+		free_from_image_views(this);
 		return -7;
 	}
 
 	result = try_create_graphics_pipeline(this);
 	if (result < 0) {
+		free_from_render_pass(this);
 		return -8;
+	}
+
+	result = try_create_framebuffers(this);
+	if (result < 0) {
+		free_from_graphics_pipeline(this);
+		return -9;
+	}
+
+	result = try_create_command_pool(this);
+	if (result < 0) {
+		free_from_framebuffers(this);
+		return -10;
+	}
+
+	result = try_create_command_buffers(this);
+	if (result < 0) {
+		free_from_command_pool(this);
+		return -11;
 	}
 	return 0;
 }

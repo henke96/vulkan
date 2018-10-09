@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "glfw_handler.h"
 
 VkResult create_window_surface(void *surface_creator, VkInstance instance, VkSurfaceKHR *surface) {
