@@ -3,23 +3,23 @@
 #include <vulkan/vulkan.h>
 
 struct vulkan_handler {
-    VkInstance instance;
-    VkPhysicalDevice physical_device;
-    VkDevice device;
-    VkQueue queue;
-    VkSurfaceKHR surface;
-    VkSwapchainKHR swapchain;
-    VkExtent2D swapchain_extent;
-    uint32_t swapchain_image_count;
-    VkImage *swapchain_images;
-    VkImageView *swapchain_imageviews;
-    VkRenderPass render_pass;
-    VkPipelineLayout pipeline_layout;
-    VkPipeline graphics_pipeline;
-    int window_width;
-    int window_height;
+	VkInstance instance;
+	VkPhysicalDevice physical_device;
+	VkDevice device;
+	VkQueue queue;
+	VkSurfaceKHR surface;
+	VkSwapchainKHR swapchain;
+	VkExtent2D swapchain_extent;
+	uint32_t swapchain_image_count;
+	VkImage *swapchain_images;
+	VkImageView *swapchain_imageviews;
+	VkRenderPass render_pass;
+	VkPipelineLayout pipeline_layout;
+	VkPipeline graphics_pipeline;
+	int window_width;
+	int window_height;
 #ifdef VULKAN_HANDLER_VALIDATION
-    VkDebugUtilsMessengerEXT callback;
+	VkDebugUtilsMessengerEXT callback;
 #endif
 };
 

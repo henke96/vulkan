@@ -4,8 +4,8 @@
 #include "../vulkan/vulkan_handler.h"
 
 struct glfw_handler {
-    struct vulkan_handler vulkan_handler;
-    GLFWwindow *window;
+	struct vulkan_handler vulkan_handler;
+	GLFWwindow *window;
 };
 
 int glfw_handler__try_init(struct glfw_handler *this, int width, int height, char *title);
