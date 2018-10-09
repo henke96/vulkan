@@ -71,7 +71,7 @@ static int try_init_device(struct vulkan_handler *this) {
 		return -3;
 	}
 	vkEnumeratePhysicalDevices(this->instance, &device_count, devices);
-	for (unsigned int i = 0; i < device_count; ++i) {
+	for (int i = 0; i < device_count; ++i) {
 		VkPhysicalDevice current_device = devices[i];
 		uint32_t queue_family_count = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(current_device, &queue_family_count, 0);
@@ -80,7 +80,7 @@ static int try_init_device(struct vulkan_handler *this) {
 			return -4;
 		}
 		vkGetPhysicalDeviceQueueFamilyProperties(current_device, &queue_family_count, queue_family_propertiess);
-		for (unsigned int j = 0; j < queue_family_count; ++j) {
+		for (int j = 0; j < queue_family_count; ++j) {
 			VkQueueFamilyProperties *queue_family_properties = queue_family_propertiess + j;
 
 			VkBool32 present_support;
