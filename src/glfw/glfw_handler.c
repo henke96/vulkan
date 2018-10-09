@@ -148,7 +148,6 @@ int glfw_handler__try_run(struct glfw_handler *this) {
 		return -1;
 	}
 	double prev_time = glfwGetTime();
-	double current_time = prev_time;
 	long frames = 0;
 	while (!glfwWindowShouldClose(this->window)) {
 		glfwPollEvents();
@@ -156,12 +155,11 @@ int glfw_handler__try_run(struct glfw_handler *this) {
 			return -2;
 		}
 		++frames;
-		current_time = glfwGetTime();
-		double delta_time = current_time - prev_time;
+		double delta_time = glfwGetTime() - prev_time;
 		if (delta_time >= 1.0) {
-			prev_time = current_time;
 			printf("%f FPS\n", frames / delta_time);
 			frames = 0;
+            prev_time = glfwGetTime();
 		}
 	}
 	vkDeviceWaitIdle(this->vulkan_handler.device);
