@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "glfw_handler.h"
 
-VkResult create_window_surface(void *surface_creator, VkInstance instance, VkSurfaceKHR *surface) {
+static VkResult create_window_surface(void *surface_creator, VkInstance instance, VkSurfaceKHR *surface) {
 	struct glfw_handler *this = (struct glfw_handler *) surface_creator;
 	return glfwCreateWindowSurface(instance, this->window, 0, surface);
 }
