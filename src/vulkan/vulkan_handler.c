@@ -199,14 +199,14 @@ static int try_create_device(struct vulkan_handler *this) {
 	return 0;
 }
 
-struct query_swapchain {
+struct try_query_swapchain {
 	int result;
 	VkPresentModeKHR best_present_mode;
 	uint32_t best_image_count;
 	VkSurfaceFormatKHR best_surface_format;
-};
-static struct query_swapchain try_query_swapchain(struct vulkan_handler *this) {
-	struct query_swapchain result;
+}
+static try_query_swapchain(struct vulkan_handler *this) {
+	struct try_query_swapchain result;
 
 	VkSurfaceCapabilitiesKHR capabilities;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(this->physical_device, this->surface, &capabilities);
@@ -263,7 +263,7 @@ static struct query_swapchain try_query_swapchain(struct vulkan_handler *this) {
 }
 
 static int try_create_swapchain(struct vulkan_handler *this, int window_width, int window_height) {
-	struct query_swapchain query = try_query_swapchain(this);
+	struct try_query_swapchain query = try_query_swapchain(this);
 	if (query.result < 0) {
 		return -1;
 	}
@@ -406,11 +406,11 @@ static int try_create_render_pass(struct vulkan_handler *this) {
 }
 
 static int try_create_graphics_pipeline(struct vulkan_handler *this) {
-	struct file__read vert_shader_code = file__read("shaders/vert.spv");
+	struct file__try_read vert_shader_code = file__try_read("shaders/vert.spv");
 	if (vert_shader_code.result < 0) {
 		return -1;
 	}
-	struct file__read frag_shader_code = file__read("shaders/frag.spv");
+	struct file__try_read frag_shader_code = file__try_read("shaders/frag.spv");
 	if (frag_shader_code.result < 0) {
 		free(vert_shader_code.malloc_bytes);
 		return -2;

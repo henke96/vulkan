@@ -1,8 +1,8 @@
 #pragma once
 
-struct file__read {
+struct file__try_read {
 	int result;
 	long length;
 	char *malloc_bytes;
-};
-struct file__read file__read(char *file_name);
+}
+file__try_read(char *file_name);

@@ -2,9 +2,9 @@
 #include <malloc.h>
 #include "file.h"
 
-struct file__read file__read(char *file_name) {
+struct file__try_read file__try_read(char *file_name) {
 	FILE *file;
-	struct file__read result;
+	struct file__try_read result;
 	file = fopen(file_name, "rb");
 	if (!file) {
 		result.result = -1;
