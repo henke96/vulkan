@@ -80,9 +80,10 @@ static int record_command_buffers(struct vulkan_handler *vulkan_handler) {
 
 static int draw_frame(struct glfw_handler *this) {
 	uint32_t image_index;
+
 	vkAcquireNextImageKHR(this->vulkan_handler.device, this->vulkan_handler.swapchain, 0xFFFFFFFFFFFFFFFF, this->image_available, VK_NULL_HANDLE, &image_index);
 
-	VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;//VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
 	VkSubmitInfo submit_info;
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -113,14 +114,17 @@ static int draw_frame(struct glfw_handler *this) {
 	return 0;
 }
 
-int glfw_handler__try_init(struct glfw_handler *this, int width, int height, char *title) {
+int glfw_handler__try_init(struct glfw_handler *this, int width, int height, char *title, int fullscreen) {
 	glfwInit();
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-	this->window = glfwCreateWindow(width, height, title, 0, 0);
-
+	GLFWmonitor *monitor = NULL;
+	if (fullscreen) {
+		monitor = glfwGetPrimaryMonitor();
+	}
+	this->window = glfwCreateWindow(width, height, title, monitor, 0);
 	uint32_t extension_count;
 	const char **extensions = glfwGetRequiredInstanceExtensions(&extension_count);
 	int result = vulkan_handler__try_init(&this->vulkan_handler, extensions, extension_count, width, height, create_window_surface, this);

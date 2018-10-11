@@ -10,6 +10,6 @@ struct glfw_handler {
 	VkSemaphore render_finished;
 };
 
-int glfw_handler__try_init(struct glfw_handler *this, int width, int height, char *title);
+int glfw_handler__try_init(struct glfw_handler *this, int width, int height, char *title, int fullscreen);
 void glfw_handler__free(struct glfw_handler *this);
 int glfw_handler__try_run(struct glfw_handler *this);

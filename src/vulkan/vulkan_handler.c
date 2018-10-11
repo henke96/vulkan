@@ -100,7 +100,7 @@ static int try_create_instance(struct vulkan_handler *this, const char **extensi
 		new_extensions[i] = extensions[i];
 	}
 	new_extensions[i] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
-	create_info.enabledExtensionCount = extension_count + 1;
+	create_info.enabledExtensionCount = (uint32_t) extension_count + 1;
 	create_info.ppEnabledExtensionNames = new_extensions;
 
 	const char *validation_layers[1] = {"VK_LAYER_LUNARG_standard_validation"};
@@ -137,41 +137,31 @@ static int try_create_device(struct vulkan_handler *this) {
 	this->queue_family_index = -1;
 	uint32_t device_count;
 	vkEnumeratePhysicalDevices(this->instance, &device_count, 0);
-	VkPhysicalDevice *devices = malloc(device_count*sizeof(*devices));
-	if (devices == 0) {
-		return -3;
-	}
+	VkPhysicalDevice devices[device_count];
 	vkEnumeratePhysicalDevices(this->instance, &device_count, devices);
+
 	for (int i = 0; i < device_count; ++i) {
 		VkPhysicalDevice current_device = devices[i];
+
 		uint32_t queue_family_count = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(current_device, &queue_family_count, 0);
-		VkQueueFamilyProperties *queue_family_propertiess = malloc(queue_family_count*sizeof(*queue_family_propertiess));
-		if (queue_family_propertiess == 0) {
-			free(devices);
-			free(queue_family_propertiess);
-			return -4;
-		}
+		VkQueueFamilyProperties queue_family_propertiess[queue_family_count];
 		vkGetPhysicalDeviceQueueFamilyProperties(current_device, &queue_family_count, queue_family_propertiess);
+
 		for (int j = 0; j < queue_family_count; ++j) {
-			VkQueueFamilyProperties *queue_family_properties = queue_family_propertiess + j;
-
 			VkBool32 present_support;
-			vkGetPhysicalDeviceSurfaceSupportKHR(current_device, j, this->surface, &present_support);
+			vkGetPhysicalDeviceSurfaceSupportKHR(current_device, (uint32_t) j, this->surface, &present_support);
 
-			if (queue_family_properties->queueCount > 0 && queue_family_properties->queueFlags & VK_QUEUE_GRAPHICS_BIT && present_support) {
+			if (queue_family_propertiess[j].queueCount > 0 && queue_family_propertiess[j].queueFlags & VK_QUEUE_GRAPHICS_BIT && present_support) {
 				this->queue_family_index = j;
 				this->physical_device = current_device;
-				free(queue_family_propertiess);
 				goto break_first;
 			}
 		}
-		free(queue_family_propertiess);
 	}
 	break_first:
-	free(devices);
 	if (this->queue_family_index == -1) {
-		return -5;
+		return -1;
 	}
 
 	VkDeviceQueueCreateInfo queue_create_info;
@@ -181,7 +171,7 @@ static int try_create_device(struct vulkan_handler *this) {
 	const float queue_priority = 1.0f;
 	queue_create_info.pQueuePriorities = &queue_priority;
 	queue_create_info.queueCount = 1;
-	queue_create_info.queueFamilyIndex = this->queue_family_index;
+	queue_create_info.queueFamilyIndex = (uint32_t) this->queue_family_index;
 
 	VkPhysicalDeviceFeatures device_features = {0};
 
@@ -205,43 +195,112 @@ static int try_create_device(struct vulkan_handler *this) {
 #endif
 
 	if (vkCreateDevice(this->physical_device, &device_create_info, 0, &this->device) != VK_SUCCESS) {
-		return -1;
+		return -2;
 	}
-	vkGetDeviceQueue(this->device, this->queue_family_index, 0, &this->queue);
+	vkGetDeviceQueue(this->device, (uint32_t) this->queue_family_index, 0, &this->queue);
 	return 0;
 }
 
+struct query_swapchain {
+	int result;
+	VkPresentModeKHR best_present_mode;
+	uint32_t best_image_count;
+	VkSurfaceFormatKHR best_surface_format;
+};
+static struct query_swapchain try_query_swapchain(struct vulkan_handler *this) {
+	struct query_swapchain result;
+
+	VkSurfaceCapabilitiesKHR capabilities;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(this->physical_device, this->surface, &capabilities);
+
+	#define PREFERRED_IMAGE_COUNT 4
+	if (capabilities.maxImageCount < PREFERRED_IMAGE_COUNT) {
+		result.best_image_count = capabilities.maxImageCount;
+	} else {
+		result.best_image_count = PREFERRED_IMAGE_COUNT;
+	}
+
+	result.best_present_mode = VK_PRESENT_MODE_FIFO_KHR; // Always supported
+
+	uint32_t present_mode_count;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(this->physical_device, this->surface, &present_mode_count, 0);
+	VkPresentModeKHR present_modes[present_mode_count];
+	vkGetPhysicalDeviceSurfacePresentModesKHR(this->physical_device, this->surface, &present_mode_count, present_modes);
+
+	for (int i = 0; i < present_mode_count; ++i) {
+		VkPresentModeKHR present_mode = present_modes[i];
+		if (present_mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+			result.best_present_mode = present_mode;
+			break;
+		}
+		if (present_mode == VK_PRESENT_MODE_MAILBOX_KHR) {
+			result.best_present_mode = present_mode;
+		}
+	}
+
+	uint32_t surface_format_count;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(this->physical_device, this->surface, &surface_format_count, 0);
+	if (surface_format_count < 1) {
+		result.result = -1;
+		return result;
+	}
+	VkSurfaceFormatKHR surface_formats[surface_format_count];
+	vkGetPhysicalDeviceSurfaceFormatsKHR(this->physical_device, this->surface, &surface_format_count, surface_formats);
+	if (surface_formats[0].format == VK_FORMAT_UNDEFINED) {
+		result.best_surface_format.format = VK_FORMAT_B8G8R8A8_UNORM;
+		result.best_surface_format.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	} else {
+		for (int i = 0; i < surface_format_count; ++i) {
+			VkSurfaceFormatKHR surface_format = surface_formats[i];
+			if (surface_format.format == VK_FORMAT_B8G8R8A8_UNORM && surface_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+				result.best_surface_format = surface_format;
+				goto surface_format_found;
+			}
+		}
+		result.best_surface_format = surface_formats[0];
+	}
+	surface_format_found:
+	result.result = 0;
+	return result;
+}
+
 static int try_create_swapchain(struct vulkan_handler *this) {
-	this->swapchain_extent.width = this->window_width;
-	this->swapchain_extent.height = this->window_height;
+	struct query_swapchain query = try_query_swapchain(this);
+	if (query.result < 0) {
+		return -1;
+	}
+	this->swapchain_surface_format = query.best_surface_format;
+
+	this->swapchain_extent.width = (uint32_t) this->window_width;
+	this->swapchain_extent.height = (uint32_t) this->window_height;
 	VkSwapchainCreateInfoKHR create_info;
 	create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	create_info.surface = this->surface;
-	create_info.minImageCount = 1;
+	create_info.minImageCount = query.best_image_count;
 	create_info.pNext = 0;
 	create_info.flags = 0;
-	create_info.imageFormat = SWAPCHAIN_FORMAT;
-	create_info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	create_info.imageFormat = this->swapchain_surface_format.format;
+	create_info.imageColorSpace = this->swapchain_surface_format.colorSpace;
 	create_info.imageExtent = this->swapchain_extent;
 	create_info.imageArrayLayers = 1;
-	create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // TODO depends on application
 	create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	create_info.queueFamilyIndexCount = 0;
 	create_info.pQueueFamilyIndices = 0;
 	create_info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 	create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	create_info.presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+	create_info.presentMode = query.best_present_mode;
 	create_info.clipped = VK_TRUE;
 	create_info.oldSwapchain = VK_NULL_HANDLE;
 
 	if (vkCreateSwapchainKHR(this->device, &create_info, 0, &this->swapchain) != VK_SUCCESS) {
-		return -1;
+		return -2;
 	}
 
 	vkGetSwapchainImagesKHR(this->device, this->swapchain, &this->swapchain_image_count, 0);
 	this->swapchain_images = malloc(this->swapchain_image_count*sizeof(*this->swapchain_images));
 	if (!this->swapchain_images) {
-		return -2;
+		return -3;
 	}
 	vkGetSwapchainImagesKHR(this->device, this->swapchain, &this->swapchain_image_count, this->swapchain_images);
 	return 0;
@@ -260,7 +319,7 @@ static int try_create_image_views(struct vulkan_handler *this) {
 		create_info.flags = 0;
 		create_info.pNext = 0;
 		create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		create_info.format = SWAPCHAIN_FORMAT;
+		create_info.format = this->swapchain_surface_format.format;
 		create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 		create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -279,7 +338,7 @@ static int try_create_image_views(struct vulkan_handler *this) {
 	return 0;
 }
 
-static int try_create_shader_module(struct vulkan_handler *this, char *code, long length, VkShaderModule *out_shader_module) {
+static int try_create_shader_module(struct vulkan_handler *this, const char *code, long length, VkShaderModule *out_shader_module) {
 	VkShaderModuleCreateInfo create_info;
 	create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	create_info.pNext = 0;
@@ -567,7 +626,7 @@ static int try_create_command_pool(struct vulkan_handler *this) {
 	create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	create_info.pNext = 0;
 	create_info.flags = 0;
-	create_info.queueFamilyIndex = this->queue_family_index;
+	create_info.queueFamilyIndex = (uint32_t) this->queue_family_index;
 
 	if (vkCreateCommandPool(this->device, &create_info, 0, &this->command_pool) != VK_SUCCESS) {
 		return -1;

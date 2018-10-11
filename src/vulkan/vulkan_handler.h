@@ -11,6 +11,7 @@ struct vulkan_handler {
 	VkSurfaceKHR surface;
 	VkSwapchainKHR swapchain;
 	VkExtent2D swapchain_extent;
+	VkSurfaceFormatKHR swapchain_surface_format;
 	uint32_t swapchain_image_count;
 	VkImage *swapchain_images;
 	VkImageView *swapchain_imageviews;
