@@ -163,12 +163,12 @@ static int try_create_device(struct vulkan_handler *this) {
 				this->queue_family_index = j;
 				this->physical_device = current_device;
 				free(queue_family_propertiess);
-				goto device_search_done;
+				goto break_first;
 			}
 		}
 		free(queue_family_propertiess);
 	}
-	device_search_done:
+	break_first:
 	free(devices);
 	if (this->queue_family_index == -1) {
 		return -5;
