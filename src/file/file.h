@@ -5,5 +5,4 @@ struct file__read {
 	long length;
 	char *malloc_bytes;
 };
-
 struct file__read file__read(char *file_name);
