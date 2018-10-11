@@ -3,7 +3,6 @@
 #include <malloc.h>
 #include <stdio.h>
 
-#define SWAPCHAIN_FORMAT VK_FORMAT_B8G8R8A8_UNORM
 #define PIPELINE_SAMPLES VK_SAMPLE_COUNT_1_BIT
 
 static void free_from_instance(struct vulkan_handler *this) {
@@ -91,10 +90,7 @@ static int try_create_instance(struct vulkan_handler *this, const char **extensi
 	create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	create_info.pApplicationInfo = &app_info;
 #ifdef VULKAN_HANDLER_VALIDATION
-	if (extension_count > 63) {
-		return -1;
-	}
-	const char *new_extensions[64];
+	const char *new_extensions[extension_count + 1];
 	int i = 0;
 	for (; i < extension_count; ++i) {
 		new_extensions[i] = extensions[i];
@@ -116,7 +112,7 @@ static int try_create_instance(struct vulkan_handler *this, const char **extensi
 	create_info.flags = 0;
 
 	if (vkCreateInstance(&create_info, 0, &this->instance) != VK_SUCCESS) {
-		return -2;
+		return -1;
 	}
 	return 0;
 }
@@ -354,7 +350,7 @@ static int try_create_shader_module(struct vulkan_handler *this, const char *cod
 
 static int try_create_render_pass(struct vulkan_handler *this) {
 	VkAttachmentDescription attachment_description;
-	attachment_description.format = SWAPCHAIN_FORMAT;
+	attachment_description.format = this->swapchain_surface_format.format;
 	attachment_description.samples = PIPELINE_SAMPLES;
 	attachment_description.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; //TODO modify these
 	attachment_description.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -492,20 +488,20 @@ static int try_create_graphics_pipeline(struct vulkan_handler *this) {
 	viewport_state_create_info.scissorCount = 1;
 	viewport_state_create_info.pScissors = &scissor;
 
-	VkPipelineRasterizationStateCreateInfo rasterizer_state_create_info;
-	rasterizer_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterizer_state_create_info.flags = 0;
-	rasterizer_state_create_info.pNext = 0;
-	rasterizer_state_create_info.depthClampEnable = VK_FALSE;
-	rasterizer_state_create_info.rasterizerDiscardEnable = VK_FALSE;
-	rasterizer_state_create_info.polygonMode = VK_POLYGON_MODE_FILL;
-	rasterizer_state_create_info.lineWidth = 1.0f;
-	rasterizer_state_create_info.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterizer_state_create_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
-	rasterizer_state_create_info.depthBiasEnable = VK_FALSE;
-	rasterizer_state_create_info.depthBiasConstantFactor = 0.0f;
-	rasterizer_state_create_info.depthBiasClamp = 0.0f;
-	rasterizer_state_create_info.depthBiasSlopeFactor = 0.0f;
+	VkPipelineRasterizationStateCreateInfo rasterization_state_create_info;
+	rasterization_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterization_state_create_info.flags = 0;
+	rasterization_state_create_info.pNext = 0;
+	rasterization_state_create_info.depthClampEnable = VK_FALSE;
+	rasterization_state_create_info.rasterizerDiscardEnable = VK_FALSE;
+	rasterization_state_create_info.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterization_state_create_info.lineWidth = 1.0f;
+	rasterization_state_create_info.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterization_state_create_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterization_state_create_info.depthBiasEnable = VK_FALSE;
+	rasterization_state_create_info.depthBiasConstantFactor = 0.0f;
+	rasterization_state_create_info.depthBiasClamp = 0.0f;
+	rasterization_state_create_info.depthBiasSlopeFactor = 0.0f;
 
 	VkPipelineMultisampleStateCreateInfo multisample_state_create_info;
 	multisample_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -567,7 +563,7 @@ static int try_create_graphics_pipeline(struct vulkan_handler *this) {
 	pipeline_create_info.pVertexInputState = &vertex_input_create_info;
 	pipeline_create_info.pInputAssemblyState = &pipeline_input_assembly_create_info;
 	pipeline_create_info.pViewportState = &viewport_state_create_info;
-	pipeline_create_info.pRasterizationState = &rasterizer_state_create_info;
+	pipeline_create_info.pRasterizationState = &rasterization_state_create_info;
 	pipeline_create_info.pMultisampleState = &multisample_state_create_info;
 	pipeline_create_info.pDepthStencilState = 0;
 	pipeline_create_info.pColorBlendState = &color_blend_state_create_info;
