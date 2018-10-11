@@ -21,6 +21,8 @@ static void free_from_window_surface(struct vulkan_handler *this) {
 	vkDestroySurfaceKHR(this->instance, this->surface, 0);
 #ifdef VULKAN_HANDLER_VALIDATION
 	free_from_debug_callback(this);
+#else
+	free_from_instance(this);
 #endif
 }
 
