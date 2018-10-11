@@ -262,15 +262,15 @@ static struct query_swapchain try_query_swapchain(struct vulkan_handler *this) {
 	return result;
 }
 
-static int try_create_swapchain(struct vulkan_handler *this) {
+static int try_create_swapchain(struct vulkan_handler *this, int window_width, int window_height) {
 	struct query_swapchain query = try_query_swapchain(this);
 	if (query.result < 0) {
 		return -1;
 	}
 	this->swapchain_surface_format = query.best_surface_format;
 
-	this->swapchain_extent.width = (uint32_t) this->window_width;
-	this->swapchain_extent.height = (uint32_t) this->window_height;
+	this->swapchain_extent.width = (uint32_t) window_width;
+	this->swapchain_extent.height = (uint32_t) window_height;
 	VkSwapchainCreateInfoKHR create_info;
 	create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	create_info.surface = this->surface;
@@ -653,9 +653,6 @@ static int try_create_command_buffers(struct vulkan_handler *this) {
 }
 
 int vulkan_handler__try_init(struct vulkan_handler *this, const char **extensions, int extension_count, int window_width, int window_height, VkResult (*create_window_surface)(void *, VkInstance, VkSurfaceKHR *), void *surface_creator) {
-	this->window_width = window_width;
-	this->window_height = window_height;
-
 	int result;
 	result = try_create_instance(this, extensions, extension_count);
 	if (result < 0) {
@@ -692,7 +689,7 @@ int vulkan_handler__try_init(struct vulkan_handler *this, const char **extension
 		return -4;
 	}
 
-	result = try_create_swapchain(this);
+	result = try_create_swapchain(this, window_width, window_height);
 	if (result < 0) {
 		free_from_device(this);
 		return -5;

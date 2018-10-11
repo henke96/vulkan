@@ -21,8 +21,6 @@ struct vulkan_handler {
 	VkFramebuffer *swapchain_framebuffers;
 	VkCommandPool command_pool;
 	VkCommandBuffer *swapchain_command_buffers;
-	int window_width;
-	int window_height;
 #ifdef VULKAN_HANDLER_VALIDATION
 	VkDebugUtilsMessengerEXT callback;
 #endif
