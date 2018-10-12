@@ -11,23 +11,51 @@ static void free_glfw(struct glfw_handler *this) {
 	glfwTerminate();
 }
 
-static void free_semaphores(struct glfw_handler *this) {
-	vkDestroySemaphore(this->vulkan_handler.device, this->render_finished, 0);
-	vkDestroySemaphore(this->vulkan_handler.device, this->image_available, 0);
+static void free_semaphores_and_fences(struct glfw_handler *this) {
+	for (int i = 0; i < FRAME_RESOURCES; ++i) {
+		vkDestroySemaphore(this->vulkan_handler.device, this->render_finished_semaphores[i], 0);
+		vkDestroySemaphore(this->vulkan_handler.device, this->image_available_semaphores[i], 0);
+		vkDestroyFence(this->vulkan_handler.device, this->resource_fences[i], 0);
+	}
 }
 
-static int create_semaphores(struct glfw_handler *this) {
-	VkSemaphoreCreateInfo create_info;
-	create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-	create_info.pNext = 0;
-	create_info.flags = 0;
-
-	if (vkCreateSemaphore(this->vulkan_handler.device, &create_info, 0, &this->image_available) != VK_SUCCESS) {
-		return -1;
+static void free_semaphores_and_fences_below(struct glfw_handler *this, int i) {
+	for (--i;i >= 0; --i) {
+		vkDestroySemaphore(this->vulkan_handler.device, this->render_finished_semaphores[i], 0);
+		vkDestroySemaphore(this->vulkan_handler.device, this->image_available_semaphores[i], 0);
+		vkDestroyFence(this->vulkan_handler.device, this->resource_fences[i], 0);
 	}
-	if (vkCreateSemaphore(this->vulkan_handler.device, &create_info, 0, &this->render_finished) != VK_SUCCESS) {
-		vkDestroySemaphore(this->vulkan_handler.device, this->image_available, 0);
-		return -2;
+}
+
+static int create_semaphores_and_fences(struct glfw_handler *this) {
+	VkSemaphoreCreateInfo semaphore_create_info;
+	semaphore_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	semaphore_create_info.pNext = 0;
+	semaphore_create_info.flags = 0;
+
+	VkFenceCreateInfo fence_create_info;
+	fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fence_create_info.pNext = 0;
+	fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+	int i = 0;
+	for (; i < FRAME_RESOURCES; ++i) {
+		if (vkCreateSemaphore(this->vulkan_handler.device, &semaphore_create_info, 0, this->image_available_semaphores + i) != VK_SUCCESS) {
+			free_semaphores_and_fences_below(this, i);
+			return -1;
+		}
+
+		if (vkCreateSemaphore(this->vulkan_handler.device, &semaphore_create_info, 0, this->render_finished_semaphores + i) != VK_SUCCESS) {
+			vkDestroySemaphore(this->vulkan_handler.device, this->image_available_semaphores[i], 0);
+			free_semaphores_and_fences_below(this, i);
+			return -2;
+		}
+
+		if (vkCreateFence(this->vulkan_handler.device, &fence_create_info, 0, this->resource_fences + i) != VK_SUCCESS) {
+			vkDestroySemaphore(this->vulkan_handler.device, this->image_available_semaphores[i], 0);
+			vkDestroySemaphore(this->vulkan_handler.device, this->render_finished_semaphores[i], 0);
+			free_semaphores_and_fences_below(this, i);
+			return -3;
+		}
 	}
 	return 0;
 }
@@ -68,7 +96,7 @@ static int record_command_buffers(struct vulkan_handler *vulkan_handler) {
 
 		vkCmdBeginRenderPass(vulkan_handler->swapchain_command_buffers[i], &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 		vkCmdBindPipeline(vulkan_handler->swapchain_command_buffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkan_handler->graphics_pipeline);
-		vkCmdDraw(vulkan_handler->swapchain_command_buffers[i], 3, 1, 0, 0);
+		vkCmdDraw(vulkan_handler->swapchain_command_buffers[i], 3, 23000, 0, 0);
 		vkCmdEndRenderPass(vulkan_handler->swapchain_command_buffers[i]);
 
 		if (vkEndCommandBuffer(vulkan_handler->swapchain_command_buffers[i]) != VK_SUCCESS) {
@@ -78,32 +106,37 @@ static int record_command_buffers(struct vulkan_handler *vulkan_handler) {
 	return 0;
 }
 
+#define MAX_UINT64 0xFFFFFFFFFFFFFFFF
 static int draw_frame(struct glfw_handler *this) {
+	this->resources_index = (this->resources_index + 1) % FRAME_RESOURCES;
+
+	vkWaitForFences(this->vulkan_handler.device, 1, this->resource_fences + this->resources_index, VK_TRUE, MAX_UINT64);
+	vkResetFences(this->vulkan_handler.device, 1, this->resource_fences + this->resources_index);
+
 	uint32_t image_index;
+	vkAcquireNextImageKHR(this->vulkan_handler.device, this->vulkan_handler.swapchain, MAX_UINT64, this->image_available_semaphores[this->resources_index], VK_NULL_HANDLE, &image_index);
 
-	vkAcquireNextImageKHR(this->vulkan_handler.device, this->vulkan_handler.swapchain, 0xFFFFFFFFFFFFFFFF, this->image_available, VK_NULL_HANDLE, &image_index);
-
-	VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;//VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+	VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
 	VkSubmitInfo submit_info;
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submit_info.pNext = 0;
 	submit_info.waitSemaphoreCount = 1;
-	submit_info.pWaitSemaphores = &this->image_available;
+	submit_info.pWaitSemaphores = this->image_available_semaphores + this->resources_index;
 	submit_info.pWaitDstStageMask = &wait_stage;
 	submit_info.commandBufferCount = 1;
-	submit_info.pCommandBuffers = (this->vulkan_handler.swapchain_command_buffers + image_index);
+	submit_info.pCommandBuffers = this->vulkan_handler.swapchain_command_buffers + image_index;
 	submit_info.signalSemaphoreCount = 1;
-	submit_info.pSignalSemaphores = &this->render_finished;
+	submit_info.pSignalSemaphores = this->render_finished_semaphores + this->resources_index;
 
-	if (vkQueueSubmit(this->vulkan_handler.queue, 1, &submit_info, VK_NULL_HANDLE) != VK_SUCCESS) {
+	if (vkQueueSubmit(this->vulkan_handler.queue, 1, &submit_info, this->resource_fences[this->resources_index]) != VK_SUCCESS) {
 		return -1;
 	}
 
 	VkPresentInfoKHR present_info;
 	present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	present_info.waitSemaphoreCount = 1;
-	present_info.pWaitSemaphores = &this->render_finished;
+	present_info.pWaitSemaphores = this->render_finished_semaphores + this->resources_index;
 	present_info.pImageIndices = &image_index;
 	present_info.pResults = 0;
 	present_info.pNext = 0;
@@ -111,6 +144,7 @@ static int draw_frame(struct glfw_handler *this) {
 	present_info.pSwapchains = &this->vulkan_handler.swapchain;
 
 	vkQueuePresentKHR(this->vulkan_handler.queue, &present_info);
+
 	return 0;
 }
 
@@ -133,7 +167,7 @@ int glfw_handler__try_init(struct glfw_handler *this, int width, int height, cha
 		return -1;
 	}
 
-	result = create_semaphores(this);
+	result = create_semaphores_and_fences(this);
 	if (result < 0) {
 		vulkan_handler__free(&this->vulkan_handler);
 		free_glfw(this);
@@ -142,7 +176,7 @@ int glfw_handler__try_init(struct glfw_handler *this, int width, int height, cha
 }
 
 void glfw_handler__free(struct glfw_handler *this) {
-	free_semaphores(this);
+	free_semaphores_and_fences(this);
 	vulkan_handler__free(&this->vulkan_handler);
 	free_glfw(this);
 }

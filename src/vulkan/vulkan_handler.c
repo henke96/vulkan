@@ -199,6 +199,7 @@ static int try_create_device(struct vulkan_handler *this) {
 	return 0;
 }
 
+#define PREFERRED_IMAGE_COUNT 4
 struct try_query_swapchain {
 	int result;
 	VkPresentModeKHR best_present_mode;
@@ -211,7 +212,6 @@ static try_query_swapchain(struct vulkan_handler *this) {
 	VkSurfaceCapabilitiesKHR capabilities;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(this->physical_device, this->surface, &capabilities);
 
-	#define PREFERRED_IMAGE_COUNT 4
 	if (capabilities.maxImageCount < PREFERRED_IMAGE_COUNT) {
 		result.best_image_count = capabilities.maxImageCount;
 	} else {
