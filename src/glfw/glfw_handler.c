@@ -235,6 +235,7 @@ int glfw_handler__try_init(struct glfw_handler *this, int width, int height, cha
 
 	result = create_semaphores_and_fences(this);
 	if (result < 0) {
+		vulkan_handler__free_command_buffers_to_swapchain(&this->vulkan_handler);
 		vulkan_handler__free(&this->vulkan_handler);
 		free_glfw(this);
 		return -3;
@@ -244,6 +245,7 @@ int glfw_handler__try_init(struct glfw_handler *this, int width, int height, cha
 
 void glfw_handler__free(struct glfw_handler *this) {
 	free_semaphores_and_fences(this);
+	vulkan_handler__free_command_buffers_to_swapchain(&this->vulkan_handler);
 	vulkan_handler__free(&this->vulkan_handler);
 	free_glfw(this);
 }

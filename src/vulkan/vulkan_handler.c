@@ -10,17 +10,17 @@ static void free_instance(struct vulkan_handler *this) {
 }
 
 #ifdef VULKAN_HANDLER_VALIDATION
-static void free_from_debug_callback(struct vulkan_handler *this) {
+static void free_debug_callback_to_instance(struct vulkan_handler *this) {
 	PFN_vkDestroyDebugUtilsMessengerEXT func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(this->instance, "vkDestroyDebugUtilsMessengerEXT");
 	func(this->instance, this->callback, 0);
-	free_from_instance(this);
+	free_instance(this);
 }
 #endif
 
 static void free_window_surface_to_instance(struct vulkan_handler *this) {
 	vkDestroySurfaceKHR(this->instance, this->surface, 0);
 #ifdef VULKAN_HANDLER_VALIDATION
-	free_from_debug_callback(this);
+	free_debug_callback_to_instance(this);
 #else
     free_instance(this);
 #endif
@@ -653,7 +653,6 @@ static int try_create_command_buffers(struct vulkan_handler *this) {
 }
 
 int vulkan_handler__try_create_swapchain_to_command_buffers(struct vulkan_handler *this, int window_width, int window_height) {
-	printf("create\n"); //TODO debug
     int result;
     result = try_create_swapchain(this, window_width, window_height);
     if (result < 0) {
@@ -710,13 +709,13 @@ int vulkan_handler__try_init(struct vulkan_handler *this, const char **extension
 
 	PFN_vkCreateDebugUtilsMessengerEXT func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(this->instance, "vkCreateDebugUtilsMessengerEXT");
 	if (func(this->instance, &create_info, 0, &this->callback) != VK_SUCCESS) {
-		free_from_instance(this);
+		free_instance(this);
 		return -2;
 	}
 #endif
 	if (callback.create_window_surface(callback.user_data, this->instance, &this->surface) != VK_SUCCESS) {
 #ifdef VULKAN_HANDLER_VALIDATION
-		free_from_debug_callback(this);
+		free_debug_callback_to_instance(this);
 #else
         free_instance(this);
 #endif
