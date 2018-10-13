@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include "glfw_handler.h"
 
-static VkResult create_window_surface(void *surface_creator, VkInstance instance, VkSurfaceKHR *surface) {
-	struct glfw_handler *this = (struct glfw_handler *) surface_creator;
-	return glfwCreateWindowSurface(instance, this->window, 0, surface);
+static VkResult create_window_surface(void *user_data, VkInstance instance, VkSurfaceKHR *surface_out) {
+	struct glfw_handler *this = (struct glfw_handler *) user_data;
+	return glfwCreateWindowSurface(instance, this->window, 0, surface_out);
 }
 
 static void free_glfw(struct glfw_handler *this) {
@@ -161,7 +161,10 @@ int glfw_handler__try_init(struct glfw_handler *this, int width, int height, cha
 	this->window = glfwCreateWindow(width, height, title, monitor, 0);
 	uint32_t extension_count;
 	const char **extensions = glfwGetRequiredInstanceExtensions(&extension_count);
-	int result = vulkan_handler__try_init(&this->vulkan_handler, extensions, extension_count, width, height, create_window_surface, this);
+	struct vulkan_handler__create_surface callback;
+	callback.create_window_surface = create_window_surface;
+	callback.user_data = this;
+	int result = vulkan_handler__try_init(&this->vulkan_handler, extensions, extension_count, width, height, callback);
 	if (result < 0) {
 		free_glfw(this);
 		return -1;

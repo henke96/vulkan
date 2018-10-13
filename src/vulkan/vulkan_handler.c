@@ -652,7 +652,7 @@ static int try_create_command_buffers(struct vulkan_handler *this) {
 	return 0;
 }
 
-int vulkan_handler__try_init(struct vulkan_handler *this, const char **extensions, int extension_count, int window_width, int window_height, VkResult (*create_window_surface)(void *, VkInstance, VkSurfaceKHR *), void *surface_creator) {
+int vulkan_handler__try_init(struct vulkan_handler *this, const char **extensions, int extension_count, int window_width, int window_height, struct vulkan_handler__create_surface callback) {
 	int result;
 	result = try_create_instance(this, extensions, extension_count);
 	if (result < 0) {
@@ -674,7 +674,7 @@ int vulkan_handler__try_init(struct vulkan_handler *this, const char **extension
 		return -2;
 	}
 #endif
-	if (create_window_surface(surface_creator, this->instance, &this->surface) != VK_SUCCESS) {
+	if (callback.create_window_surface(callback.user_data, this->instance, &this->surface) != VK_SUCCESS) {
 #ifdef VULKAN_HANDLER_VALIDATION
 		free_from_debug_callback(this);
 #else
@@ -730,5 +730,9 @@ int vulkan_handler__try_init(struct vulkan_handler *this, const char **extension
 		free_from_command_pool(this);
 		return -11;
 	}
+	return 0;
+}
+
+int vulkan_handler__try_recreate_swapchain(struct vulkan_handler *this, int window_width, int window_height, struct vulkan_handler__create_surface callback) {
 	return 0;
 }

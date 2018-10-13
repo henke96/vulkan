@@ -27,4 +27,11 @@ struct vulkan_handler {
 };
 
 void vulkan_handler__free(struct vulkan_handler *this);
-int vulkan_handler__try_init(struct vulkan_handler *this, const char **extensions, int extension_count, int window_width, int window_height, VkResult (*create_window_surface)(void *, VkInstance, VkSurfaceKHR *), void *surface_creator);
+
+struct vulkan_handler__create_surface {
+    VkResult (*create_window_surface)(void *user_data, VkInstance instance, VkSurfaceKHR *surface_out);
+    void *user_data;
+};
+
+int vulkan_handler__try_init(struct vulkan_handler *this, const char **extensions, int extension_count, int window_width, int window_height, struct vulkan_handler__create_surface callback);
+int vulkan_handler__try_recreate_swapchain(struct vulkan_handler *this, int window_width, int window_height, struct vulkan_handler__create_surface callback);
