@@ -204,11 +204,13 @@ int glfw_handler__try_init(struct glfw_handler *this, int width, int height, cha
 	glfwInit();
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
 	GLFWmonitor *monitor = NULL;
 	if (fullscreen) {
 		monitor = glfwGetPrimaryMonitor();
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	} else {
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 	}
 	this->window = glfwCreateWindow(width, height, title, monitor, 0);
 	glfwSetWindowUserPointer(this->window, this);

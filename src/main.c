@@ -3,7 +3,7 @@
 
 int main(int argc, char **argv) {
 	struct glfw_handler glfw_handler;
-	int result = glfw_handler__try_init(&glfw_handler, 800, 600, "Vulkan", 0);
+	int result = glfw_handler__try_init(&glfw_handler, 1920, 1080, "Vulkan", 1);
 	if (result < 0) {
 		return -1;
 	}
