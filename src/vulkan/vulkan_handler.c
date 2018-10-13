@@ -5,7 +5,7 @@
 
 #define PIPELINE_SAMPLES VK_SAMPLE_COUNT_1_BIT
 
-static void free_from_instance(struct vulkan_handler *this) {
+static void free_instance(struct vulkan_handler *this) {
 	vkDestroyInstance(this->instance, 0);
 }
 
@@ -17,65 +17,65 @@ static void free_from_debug_callback(struct vulkan_handler *this) {
 }
 #endif
 
-static void free_from_window_surface(struct vulkan_handler *this) {
+static void free_window_surface_to_instance(struct vulkan_handler *this) {
 	vkDestroySurfaceKHR(this->instance, this->surface, 0);
 #ifdef VULKAN_HANDLER_VALIDATION
 	free_from_debug_callback(this);
 #else
-	free_from_instance(this);
+    free_instance(this);
 #endif
 }
 
-static void free_from_device(struct vulkan_handler *this) {
+static void free_device_to_instance(struct vulkan_handler *this) {
 	vkDestroyDevice(this->device, 0);
-	free_from_window_surface(this);
+    free_window_surface_to_instance(this);
 }
 
-static void free_from_swapchain(struct vulkan_handler *this) {
-	vkDestroySwapchainKHR(this->device, this->swapchain, 0);
-	free(this->swapchain_images);
-	free_from_device(this);
+static void free_command_pool_to_instance(struct vulkan_handler *this) {
+    vkDestroyCommandPool(this->device, this->command_pool, 0);
+    free_device_to_instance(this);
 }
 
-static void free_from_image_views(struct vulkan_handler *this) {
-	for (int i = 0; i < this->swapchain_image_count; ++i) {
-		vkDestroyImageView(this->device, this->swapchain_imageviews[i], 0);
-	}
-	free(this->swapchain_imageviews);
-	free_from_swapchain(this);
+static void free_swapchain(struct vulkan_handler *this) {
+    vkDestroySwapchainKHR(this->device, this->swapchain, 0);
+    free(this->swapchain_images);
 }
 
-static void free_from_render_pass(struct vulkan_handler *this) {
-	vkDestroyRenderPass(this->device, this->render_pass, 0);
-	free_from_image_views(this);
+static void free_image_views_to_swapchain(struct vulkan_handler *this) {
+    for (int i = 0; i < this->swapchain_image_count; ++i) {
+        vkDestroyImageView(this->device, this->swapchain_imageviews[i], 0);
+    }
+    free(this->swapchain_imageviews);
+    free_swapchain(this);
 }
 
-static void free_from_graphics_pipeline(struct vulkan_handler *this) {
-	vkDestroyPipeline(this->device, this->graphics_pipeline, 0);
-	vkDestroyPipelineLayout(this->device, this->pipeline_layout, 0);
-	free_from_render_pass(this);
+static void free_render_pass_to_swapchain(struct vulkan_handler *this) {
+    vkDestroyRenderPass(this->device, this->render_pass, 0);
+    free_image_views_to_swapchain(this);
 }
 
-static void free_from_framebuffers(struct vulkan_handler *this) {
-	for (int i = 0; i < this->swapchain_image_count; ++i) {
-		vkDestroyFramebuffer(this->device, this->swapchain_framebuffers[i], 0);
-	}
-	free(this->swapchain_framebuffers);
-	free_from_graphics_pipeline(this);
+static void free_graphics_pipeline_to_swapchain(struct vulkan_handler *this) {
+    vkDestroyPipeline(this->device, this->graphics_pipeline, 0);
+    vkDestroyPipelineLayout(this->device, this->pipeline_layout, 0);
+    free_render_pass_to_swapchain(this);
 }
 
-static void free_from_command_pool(struct vulkan_handler *this) {
-	vkDestroyCommandPool(this->device, this->command_pool, 0);
-	free_from_framebuffers(this);
+static void free_framebuffers_to_swapchain(struct vulkan_handler *this) {
+    for (int i = 0; i < this->swapchain_image_count; ++i) {
+        vkDestroyFramebuffer(this->device, this->swapchain_framebuffers[i], 0);
+    }
+    free(this->swapchain_framebuffers);
+    free_graphics_pipeline_to_swapchain(this);
 }
 
-static void free_from_command_buffers(struct vulkan_handler *this) {
-	free(this->swapchain_command_buffers);
-	free_from_command_pool(this);
+void vulkan_handler__free_command_buffers_to_swapchain(struct vulkan_handler *this) {
+    vkFreeCommandBuffers(this->device, this->command_pool, this->swapchain_image_count, this->swapchain_command_buffers);
+    free(this->swapchain_command_buffers);
+    free_framebuffers_to_swapchain(this);
 }
 
 void vulkan_handler__free(struct vulkan_handler *this) {
-	free_from_command_buffers(this);
+    free_command_pool_to_instance(this);
 }
 
 static int try_create_instance(struct vulkan_handler *this, const char **extensions, int extension_count) {
@@ -652,7 +652,47 @@ static int try_create_command_buffers(struct vulkan_handler *this) {
 	return 0;
 }
 
-int vulkan_handler__try_init(struct vulkan_handler *this, const char **extensions, int extension_count, int window_width, int window_height, struct vulkan_handler__create_surface callback) {
+int vulkan_handler__try_create_swapchain_to_command_buffers(struct vulkan_handler *this, int window_width, int window_height) {
+	printf("create\n"); //TODO debug
+    int result;
+    result = try_create_swapchain(this, window_width, window_height);
+    if (result < 0) {
+        return -1;
+    }
+
+    result = try_create_image_views(this);
+    if (result < 0) {
+        free_swapchain(this);
+        return -2;
+    }
+
+    result = try_create_render_pass(this);
+    if (result < 0) {
+        free_image_views_to_swapchain(this);
+        return -3;
+    }
+
+    result = try_create_graphics_pipeline(this);
+    if (result < 0) {
+        free_render_pass_to_swapchain(this);
+        return -4;
+    }
+
+    result = try_create_framebuffers(this);
+    if (result < 0) {
+        free_graphics_pipeline_to_swapchain(this);
+        return -5;
+    }
+
+    result = try_create_command_buffers(this);
+    if (result < 0) {
+        free_framebuffers_to_swapchain(this);
+        return -6;
+    }
+    return 0;
+}
+
+int vulkan_handler__try_init(struct vulkan_handler *this, const char **extensions, int extension_count, struct vulkan_handler__create_surface callback) {
 	int result;
 	result = try_create_instance(this, extensions, extension_count);
 	if (result < 0) {
@@ -678,61 +718,22 @@ int vulkan_handler__try_init(struct vulkan_handler *this, const char **extension
 #ifdef VULKAN_HANDLER_VALIDATION
 		free_from_debug_callback(this);
 #else
-		free_from_instance(this);
+        free_instance(this);
 #endif
 		return -3;
 	}
 
 	result = try_create_device(this);
 	if (result < 0) {
-		free_from_window_surface(this);
+        free_window_surface_to_instance(this);
 		return -4;
 	}
 
-	result = try_create_swapchain(this, window_width, window_height);
-	if (result < 0) {
-		free_from_device(this);
-		return -5;
-	}
-
-	result = try_create_image_views(this);
-	if (result < 0) {
-		free_from_swapchain(this);
-		return -6;
-	}
-
-	result = try_create_render_pass(this);
-	if (result < 0) {
-		free_from_image_views(this);
-		return -7;
-	}
-
-	result = try_create_graphics_pipeline(this);
-	if (result < 0) {
-		free_from_render_pass(this);
-		return -8;
-	}
-
-	result = try_create_framebuffers(this);
-	if (result < 0) {
-		free_from_graphics_pipeline(this);
-		return -9;
-	}
-
-	result = try_create_command_pool(this);
-	if (result < 0) {
-		free_from_framebuffers(this);
-		return -10;
-	}
-
-	result = try_create_command_buffers(this);
-	if (result < 0) {
-		free_from_command_pool(this);
-		return -11;
-	}
+    result = try_create_command_pool(this);
+    if (result < 0) {
+        free_device_to_instance(this);
+        return -5;
+    }
 	return 0;
 }
 
-int vulkan_handler__try_recreate_swapchain(struct vulkan_handler *this, int window_width, int window_height, struct vulkan_handler__create_surface callback) {
-	return 0;
-}

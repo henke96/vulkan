@@ -96,12 +96,33 @@ static int record_command_buffers(struct vulkan_handler *vulkan_handler) {
 
 		vkCmdBeginRenderPass(vulkan_handler->swapchain_command_buffers[i], &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 		vkCmdBindPipeline(vulkan_handler->swapchain_command_buffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, vulkan_handler->graphics_pipeline);
-		vkCmdDraw(vulkan_handler->swapchain_command_buffers[i], 3, 23000, 0, 0);
+		vkCmdDraw(vulkan_handler->swapchain_command_buffers[i], 3, 1, 0, 0);
 		vkCmdEndRenderPass(vulkan_handler->swapchain_command_buffers[i]);
 
 		if (vkEndCommandBuffer(vulkan_handler->swapchain_command_buffers[i]) != VK_SUCCESS) {
 			return -2;
 		}
+	}
+	return 0;
+}
+
+static int try_recreate_swapchain(struct glfw_handler *this) {
+	int width, height;
+	glfwGetFramebufferSize(this->window, &width, &height);
+
+	if (width == 0 || height == 0) {
+		return 1;
+	}
+
+	vkDeviceWaitIdle(this->vulkan_handler.device);
+	vulkan_handler__free_command_buffers_to_swapchain(&this->vulkan_handler);
+
+	if (vulkan_handler__try_create_swapchain_to_command_buffers(&this->vulkan_handler, width, height) < 0) {
+		return -1;
+	}
+
+	if (record_command_buffers(&this->vulkan_handler) < 0) {
+		return -2;
 	}
 	return 0;
 }
@@ -114,8 +135,24 @@ static int draw_frame(struct glfw_handler *this) {
 	vkResetFences(this->vulkan_handler.device, 1, this->resource_fences + this->resources_index);
 
 	uint32_t image_index;
-	vkAcquireNextImageKHR(this->vulkan_handler.device, this->vulkan_handler.swapchain, MAX_UINT64, this->image_available_semaphores[this->resources_index], VK_NULL_HANDLE, &image_index);
+	while (1) {
+		VkResult vk_result = vkAcquireNextImageKHR(this->vulkan_handler.device, this->vulkan_handler.swapchain, MAX_UINT64,
+												this->image_available_semaphores[this->resources_index], VK_NULL_HANDLE,
+												&image_index);
 
+		if (vk_result == VK_SUCCESS || vk_result == VK_SUBOPTIMAL_KHR) {
+			break;
+		} else if (vk_result == VK_ERROR_OUT_OF_DATE_KHR) {
+			int result = try_recreate_swapchain(this);
+			if (result < 0) {
+				return -1;
+			} else if (result == 1) {
+				return 0;
+			}
+		} else {
+			return -2;
+		}
+	}
 	VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
 	VkSubmitInfo submit_info;
@@ -130,7 +167,7 @@ static int draw_frame(struct glfw_handler *this) {
 	submit_info.pSignalSemaphores = this->render_finished_semaphores + this->resources_index;
 
 	if (vkQueueSubmit(this->vulkan_handler.queue, 1, &submit_info, this->resource_fences[this->resources_index]) != VK_SUCCESS) {
-		return -1;
+		return -3;
 	}
 
 	VkPresentInfoKHR present_info;
@@ -143,37 +180,64 @@ static int draw_frame(struct glfw_handler *this) {
 	present_info.swapchainCount = 1;
 	present_info.pSwapchains = &this->vulkan_handler.swapchain;
 
-	vkQueuePresentKHR(this->vulkan_handler.queue, &present_info);
-
+	VkResult vk_result = vkQueuePresentKHR(this->vulkan_handler.queue, &present_info);
+	if (vk_result != VK_SUCCESS) {
+		if (vk_result == VK_SUBOPTIMAL_KHR || vk_result == VK_ERROR_OUT_OF_DATE_KHR) {
+			int result = try_recreate_swapchain(this);
+			if (result < 0) {
+				return -4;
+			}
+		} else {
+			return -5;
+		}
+	}
 	return 0;
 }
 
+static void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
+	struct glfw_handler *this = glfwGetWindowUserPointer(window);
+	this->should_recreate_swapchain = 1;
+}
+
 int glfw_handler__try_init(struct glfw_handler *this, int width, int height, char *title, int fullscreen) {
+	this->resources_index = 0;
 	glfwInit();
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
 	GLFWmonitor *monitor = NULL;
 	if (fullscreen) {
 		monitor = glfwGetPrimaryMonitor();
 	}
 	this->window = glfwCreateWindow(width, height, title, monitor, 0);
+	glfwSetWindowUserPointer(this->window, this);
+	glfwSetFramebufferSizeCallback(this->window, framebuffer_size_callback);
+
 	uint32_t extension_count;
 	const char **extensions = glfwGetRequiredInstanceExtensions(&extension_count);
 	struct vulkan_handler__create_surface callback;
 	callback.create_window_surface = create_window_surface;
 	callback.user_data = this;
-	int result = vulkan_handler__try_init(&this->vulkan_handler, extensions, extension_count, width, height, callback);
+	int result = vulkan_handler__try_init(&this->vulkan_handler, extensions, extension_count, callback);
 	if (result < 0) {
 		free_glfw(this);
 		return -1;
+	}
+
+	result = vulkan_handler__try_create_swapchain_to_command_buffers(&this->vulkan_handler, width, height);
+	if (result < 0) {
+	    vulkan_handler__free_command_buffers_to_swapchain(&this->vulkan_handler);
+	    vulkan_handler__free(&this->vulkan_handler);
+	    free_glfw(this);
+	    return -2;
 	}
 
 	result = create_semaphores_and_fences(this);
 	if (result < 0) {
 		vulkan_handler__free(&this->vulkan_handler);
 		free_glfw(this);
+		return -3;
 	}
 	return 0;
 }
@@ -191,16 +255,28 @@ int glfw_handler__try_run(struct glfw_handler *this) {
 	double prev_time = glfwGetTime();
 	long frames = 0;
 	while (!glfwWindowShouldClose(this->window)) {
-		glfwPollEvents();
-		if (draw_frame(this) < 0) {
-			return -2;
-		}
 		++frames;
 		double delta_time = glfwGetTime() - prev_time;
 		if (delta_time >= 1.0) {
 			printf("%f FPS\n", frames / delta_time);
 			frames = 0;
-            prev_time = glfwGetTime();
+			prev_time = glfwGetTime();
+		}
+
+		glfwPollEvents();
+		if (this->should_recreate_swapchain) {
+			int result = try_recreate_swapchain(this);
+			if (result < 0) {
+				return -2;
+			} else if (result == 1) {
+				continue;
+			}
+			this->should_recreate_swapchain = 0;
+		}
+
+		int result = draw_frame(this);
+		if (result < 0) {
+			return -3;
 		}
 	}
 	vkDeviceWaitIdle(this->vulkan_handler.device);

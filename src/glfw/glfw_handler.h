@@ -12,6 +12,7 @@ struct glfw_handler {
 	VkSemaphore render_finished_semaphores[FRAME_RESOURCES];
 	VkFence resource_fences[FRAME_RESOURCES];
 	int resources_index;
+	int should_recreate_swapchain;
 };
 
 int glfw_handler__try_init(struct glfw_handler *this, int width, int height, char *title, int fullscreen);
