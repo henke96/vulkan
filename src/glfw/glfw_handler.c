@@ -254,10 +254,20 @@ int glfw_handler__try_init(struct glfw_handler *this, int width, int height, cha
 		free_glfw(this);
 		return -4;
 	}
+
+	result = vulkan_texture__try_init(&this->test_texture, &this->vulkan_base, width, height);
+	if (result < 0) {
+        free_semaphores_and_fences(this);
+        vulkan_swapchain__free_swapchain(&this->vulkan_swapchain);
+        vulkan_swapchain__free(&this->vulkan_swapchain);
+        vulkan_base__free(&this->vulkan_base);
+        free_glfw(this);
+	}
 	return 0;
 }
 
 void glfw_handler__free(struct glfw_handler *this) {
+    vulkan_texture__free(&this->test_texture);
 	free_semaphores_and_fences(this);
 	vulkan_swapchain__free_swapchain(&this->vulkan_swapchain);
 	vulkan_swapchain__free(&this->vulkan_swapchain);

@@ -5,6 +5,7 @@
 struct vulkan_base {
 	VkInstance instance;
 	VkPhysicalDevice physical_device;
+	VkPhysicalDeviceMemoryProperties memory_properties;
 	VkDevice device;
 	VkQueue queue;
 	int queue_family_index;

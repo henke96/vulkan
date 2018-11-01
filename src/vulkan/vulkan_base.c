@@ -39,18 +39,9 @@ void vulkan_base__free(struct vulkan_base *this) {
 }
 
 static int try_create_instance(struct vulkan_base *this, const char **extensions, int extension_count) {
-	VkApplicationInfo app_info;
-	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	app_info.pApplicationName = 0;
-	app_info.applicationVersion = 0;
-	app_info.pEngineName = 0;
-	app_info.engineVersion = 0;
-	app_info.pNext = 0;
-	app_info.apiVersion = VK_API_VERSION_1_1;
-
 	VkInstanceCreateInfo create_info;
 	create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	create_info.pApplicationInfo = &app_info;
+	create_info.pApplicationInfo = 0;
 #ifdef VULKAN_BASE_VALIDATION
 	const char *new_extensions[extension_count + 1];
 	int i = 0;
@@ -113,14 +104,16 @@ static int try_create_device(struct vulkan_base *this) {
 			if (queue_family_propertiess[j].queueCount > 0 && queue_family_propertiess[j].queueFlags & VK_QUEUE_GRAPHICS_BIT && present_support) {
 				this->queue_family_index = j;
 				this->physical_device = current_device;
-				goto break_first;
+				goto break_outer;
 			}
 		}
 	}
-	break_first:
+	break_outer:
 	if (this->queue_family_index == -1) {
 		return -1;
 	}
+
+	vkGetPhysicalDeviceMemoryProperties(this->physical_device, &this->memory_properties);
 
 	VkDeviceQueueCreateInfo queue_create_info;
 	queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;

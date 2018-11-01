@@ -2,6 +2,7 @@
 #include "vulkan_swapchain.h"
 #include "../file/file.h"
 
+#define IMAGE_USAGE VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
 #define PIPELINE_SAMPLES VK_SAMPLE_COUNT_1_BIT
 #define PREFERRED_IMAGE_COUNT 4
 
@@ -85,6 +86,7 @@ static try_query_swapchain(struct vulkan_swapchain *this) {
         result.result = -1;
         return result;
     }
+
     VkSurfaceFormatKHR surface_formats[surface_format_count];
     vkGetPhysicalDeviceSurfaceFormatsKHR(this->base->physical_device, this->base->surface, &surface_format_count, surface_formats);
     if (surface_formats[0].format == VK_FORMAT_UNDEFINED) {
@@ -124,7 +126,7 @@ static int try_create_swapchain(struct vulkan_swapchain *this, int window_width,
     create_info.imageColorSpace = this->surface_format.colorSpace;
     create_info.imageExtent = this->extent;
     create_info.imageArrayLayers = 1;
-    create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // TODO depends on application
+    create_info.imageUsage = IMAGE_USAGE;
     create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     create_info.queueFamilyIndexCount = 0;
     create_info.pQueueFamilyIndices = 0;
