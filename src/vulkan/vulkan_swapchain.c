@@ -470,13 +470,13 @@ void vulkan_swapchain__free(struct vulkan_swapchain *this) {
 
 int vulkan_swapchain__try_init(struct vulkan_swapchain *this, struct vulkan_base *base) {
     this->base = base;
-    struct file__try_read vert_read = file__try_read("shaders/shader.vert");
+    struct file__try_read vert_read = file__try_read("shaders/vert.spv");
     if (vert_read.result < 0) {
         return -1;
     }
     this->vert_shader.length = vert_read.length;
     this->vert_shader.bytes = vert_read.malloc_bytes;
-    struct file__try_read frag_read = file__try_read("shaders/shader.frag");
+    struct file__try_read frag_read = file__try_read("shaders/frag.spv");
     if (frag_read.result < 0) {
         free(vert_read.malloc_bytes);
         return -2;
