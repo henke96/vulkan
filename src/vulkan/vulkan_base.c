@@ -65,7 +65,7 @@ static int try_create_instance(struct vulkan_base *this, const char **extensions
 	create_info.enabledLayerCount = 1;
 	create_info.ppEnabledLayerNames = validation_layers;
 #else
-	create_info.enabledExtensionCount = extension_count;
+	create_info.enabledExtensionCount = (uint32_t) extension_count;
 	create_info.ppEnabledExtensionNames = extensions;
 	create_info.enabledLayerCount = 0;
 	create_info.ppEnabledLayerNames = 0;
