@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "glfw_handler.h"
 
+#define MAX_UINT64 0xFFFFFFFFFFFFFFFF
+
 static VkResult create_window_surface(void *user_data, VkInstance instance, VkSurfaceKHR *surface_out) {
 	struct glfw_handler *this = (struct glfw_handler *) user_data;
 	return glfwCreateWindowSurface(instance, this->window, 0, surface_out);
@@ -60,7 +62,7 @@ static int create_semaphores_and_fences(struct glfw_handler *this) {
 	return 0;
 }
 
-static int record_command_buffers(struct glfw_handler *this) {
+static int try_record_command_buffers(struct glfw_handler *this) {
 	for (int i = 0; i < this->vulkan_swapchain.image_count; ++i) {
 		VkCommandBufferBeginInfo command_begin_info;
 		command_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -106,12 +108,15 @@ static int record_command_buffers(struct glfw_handler *this) {
 	return 0;
 }
 
-static int try_recreate_swapchain(struct glfw_handler *this) {
+enum try_recreate_swapchain {
+    TRY_RECREATE_SWAPCHAIN__NO_AREA = 1
+}
+static try_recreate_swapchain(struct glfw_handler *this) {
 	int width, height;
 	glfwGetFramebufferSize(this->window, &width, &height);
 
 	if (width == 0 || height == 0) {
-		return 1;
+		return TRY_RECREATE_SWAPCHAIN__NO_AREA;
 	}
 
 	vkDeviceWaitIdle(this->vulkan_base.device);
@@ -121,13 +126,12 @@ static int try_recreate_swapchain(struct glfw_handler *this) {
 		return -1;
 	}
 
-	if (record_command_buffers(this) < 0) {
+	if (try_record_command_buffers(this) < 0) {
 		return -2;
 	}
 	return 0;
 }
 
-#define MAX_UINT64 0xFFFFFFFFFFFFFFFF
 static int draw_frame(struct glfw_handler *this) {
 	this->resources_index = (this->resources_index + 1) % FRAME_RESOURCES;
 
@@ -146,7 +150,7 @@ static int draw_frame(struct glfw_handler *this) {
 			int result = try_recreate_swapchain(this);
 			if (result < 0) {
 				return -1;
-			} else if (result == 1) {
+			} else if (result == TRY_RECREATE_SWAPCHAIN__NO_AREA) {
 				return 0;
 			}
 		} else {
@@ -262,7 +266,7 @@ void glfw_handler__free(struct glfw_handler *this) {
 }
 
 int glfw_handler__try_run(struct glfw_handler *this) {
-	if (record_command_buffers(this) < 0) {
+	if (try_record_command_buffers(this) < 0) {
 		return -1;
 	}
 	double prev_time = glfwGetTime();
@@ -281,7 +285,7 @@ int glfw_handler__try_run(struct glfw_handler *this) {
 			int result = try_recreate_swapchain(this);
 			if (result < 0) {
 				return -2;
-			} else if (result == 1) {
+			} else if (result == TRY_RECREATE_SWAPCHAIN__NO_AREA) {
 				continue;
 			}
 			this->should_recreate_swapchain = 0;
