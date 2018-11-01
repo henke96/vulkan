@@ -1,13 +1,23 @@
 #include "vulkan_texture.h"
 #include "vulkan_base.h"
 
+void *vulkan_texture__map(struct vulkan_texture *this) {
+    void *data;
+    vkMapMemory(this->base->device, this->staging_buffer_memory, 0, this->size, 0, &data);
+    return data;
+}
+void vulkan_texture__unmap(struct vulkan_texture *this) {
+    vkUnmapMemory(this->base->device, this->staging_buffer_memory);
+}
+
 int vulkan_texture__try_init(struct vulkan_texture *this, struct vulkan_base *base, int width, int height) {
     this->base = base;
+    this->size = (VkDeviceSize) width*height*4;
 
     VkBufferCreateInfo create_info;
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    create_info.size = (VkDeviceSize) width*height*4;
-    create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    create_info.size = this->size;
+    create_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     create_info.queueFamilyIndexCount = 0;
     create_info.pQueueFamilyIndices = 0;

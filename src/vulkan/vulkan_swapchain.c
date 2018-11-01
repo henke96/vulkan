@@ -1,7 +1,6 @@
 #include <malloc.h>
 #include "vulkan_swapchain.h"
 
-#define IMAGE_USAGE VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
 #define PREFERRED_IMAGE_COUNT 4
 
 static void free_swapchain(struct vulkan_swapchain *this) {
@@ -86,15 +85,15 @@ static try_query_swapchain(struct vulkan_swapchain *this) {
     return result;
 }
 
-static int try_create_swapchain(struct vulkan_swapchain *this, int window_width, int window_height) {
+static int try_create_swapchain(struct vulkan_swapchain *this, int width, int height, VkImageUsageFlagBits image_usage) {
     struct try_query_swapchain query = try_query_swapchain(this);
     if (query.result < 0) {
         return -1;
     }
     this->surface_format = query.best_surface_format;
 
-    this->extent.width = (uint32_t) window_width;
-    this->extent.height = (uint32_t) window_height;
+    this->extent.width = (uint32_t) width;
+    this->extent.height = (uint32_t) height;
     VkSwapchainCreateInfoKHR create_info;
     create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     create_info.surface = this->base->surface;
@@ -105,7 +104,7 @@ static int try_create_swapchain(struct vulkan_swapchain *this, int window_width,
     create_info.imageColorSpace = this->surface_format.colorSpace;
     create_info.imageExtent = this->extent;
     create_info.imageArrayLayers = 1;
-    create_info.imageUsage = IMAGE_USAGE;
+    create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;//VK_IMAGE_USAGE_TRANSFER_DST_BIT;//;image_usage;
     create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     create_info.queueFamilyIndexCount = 0;
     create_info.pQueueFamilyIndices = 0;
@@ -192,9 +191,9 @@ void vulkan_swapchain__free_swapchain(struct vulkan_swapchain *this) {
     free_from_command_buffers(this);
 }
 
-int vulkan_swapchain__try_init_swapchain(struct vulkan_swapchain *this, int window_width, int window_height) {
+int vulkan_swapchain__try_init_swapchain(struct vulkan_swapchain *this, int width, int height, VkImageUsageFlagBits image_usage) {
     int result;
-    result = try_create_swapchain(this, window_width, window_height);
+    result = try_create_swapchain(this, width, height, image_usage);
     if (result < 0) {
         return -1;
     }

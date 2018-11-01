@@ -18,5 +18,5 @@ struct vulkan_swapchain {
 int vulkan_swapchain__try_init(struct vulkan_swapchain *this, struct vulkan_base *base);
 void vulkan_swapchain__free(struct vulkan_swapchain *this);
 
-int vulkan_swapchain__try_init_swapchain(struct vulkan_swapchain *this, int window_width, int window_height);
+int vulkan_swapchain__try_init_swapchain(struct vulkan_swapchain *this, int width, int height, VkImageUsageFlagBits image_usage);
 void vulkan_swapchain__free_swapchain(struct vulkan_swapchain *this);
