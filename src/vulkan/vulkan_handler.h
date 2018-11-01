@@ -9,18 +9,10 @@ struct vulkan_handler {
 	VkQueue queue;
 	int queue_family_index;
 	VkSurfaceKHR surface;
-	VkSwapchainKHR swapchain;
-	VkExtent2D swapchain_extent;
-	VkSurfaceFormatKHR swapchain_surface_format;
-	uint32_t swapchain_image_count;
-	VkImage *swapchain_images;
-	VkImageView *swapchain_imageviews;
 	VkRenderPass render_pass;
 	VkPipelineLayout pipeline_layout;
 	VkPipeline graphics_pipeline;
-	VkFramebuffer *swapchain_framebuffers;
 	VkCommandPool command_pool;
-	VkCommandBuffer *swapchain_command_buffers;
 #ifdef VULKAN_HANDLER_VALIDATION
 	VkDebugUtilsMessengerEXT callback;
 #endif

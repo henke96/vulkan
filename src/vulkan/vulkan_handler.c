@@ -593,32 +593,6 @@ static int try_create_graphics_pipeline(struct vulkan_handler *this) {
 	return 0;
 }
 
-static int try_create_framebuffers(struct vulkan_handler *this) {
-	this->swapchain_framebuffers = malloc(this->swapchain_image_count*sizeof(*this->swapchain_framebuffers));
-	if (!this->swapchain_framebuffers) {
-		return -1;
-	}
-
-	for (int i = 0; i < this->swapchain_image_count; ++i) {
-		VkFramebufferCreateInfo create_info;
-		create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		create_info.renderPass = this->render_pass;
-		create_info.attachmentCount = 1;
-		create_info.pAttachments = (this->swapchain_imageviews + i);
-		create_info.width = this->swapchain_extent.width;
-		create_info.height = this->swapchain_extent.height;
-		create_info.layers = 1;
-		create_info.flags = 0;
-		create_info.pNext = 0;
-
-		if (vkCreateFramebuffer(this->device, &create_info, 0, this->swapchain_framebuffers + i) != VK_SUCCESS) {
-			free(this->swapchain_framebuffers);
-			return -2;
-		}
-	}
-	return 0;
-}
-
 static int try_create_command_pool(struct vulkan_handler *this) {
 	VkCommandPoolCreateInfo create_info;
 	create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -628,26 +602,6 @@ static int try_create_command_pool(struct vulkan_handler *this) {
 
 	if (vkCreateCommandPool(this->device, &create_info, 0, &this->command_pool) != VK_SUCCESS) {
 		return -1;
-	}
-	return 0;
-}
-
-static int try_create_command_buffers(struct vulkan_handler *this) {
-	this->swapchain_command_buffers = malloc(this->swapchain_image_count*sizeof(*this->swapchain_command_buffers));
-	if (!this->swapchain_command_buffers) {
-		return -1;
-	}
-
-	VkCommandBufferAllocateInfo allocate_info;
-	allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocate_info.commandPool = this->command_pool;
-	allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocate_info.commandBufferCount = this->swapchain_image_count;
-	allocate_info.pNext = 0;
-
-	if (vkAllocateCommandBuffers(this->device, &allocate_info, this->swapchain_command_buffers) != VK_SUCCESS) {
-		free(this->swapchain_command_buffers);
-		return -2;
 	}
 	return 0;
 }

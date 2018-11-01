@@ -9,7 +9,7 @@ set(CMAKE_C_FLAGS "-Wall -Wpedantic")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DVULKAN_HANDLER_VALIDATION")
 set(CMAKE_C_FLAGS_RELEASE "-O3")
 
-add_executable(vulkan_base src/main.c src/vulkan/vulkan_handler.c src/vulkan/vulkan_handler.h src/glfw/glfw_handler.c src/glfw/glfw_handler.h src/file/file.c src/file/file.h)
+add_executable(vulkan_base src/main.c src/vulkan/vulkan_handler.c src/vulkan/vulkan_handler.h src/glfw/glfw_handler.c src/glfw/glfw_handler.h src/file/file.c src/file/file.h src/vulkan/vulkan_swapchain.c src/vulkan/vulkan_swapchain.h)
 
 find_package(vulkan)
 message(STATUS "${Vulkan_LIBRARIES}")
