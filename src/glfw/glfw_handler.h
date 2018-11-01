@@ -1,12 +1,14 @@
 #pragma once
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-#include "../vulkan/vulkan_handler.h"
+#include "../vulkan/vulkan_base.h"
+#include "../vulkan/vulkan_swapchain.h"
 
 #define FRAME_RESOURCES 2
 
 struct glfw_handler {
-	struct vulkan_handler vulkan_handler;
+	struct vulkan_base vulkan_base;
+	struct vulkan_swapchain vulkan_swapchain;
 	GLFWwindow *window;
 	VkSemaphore image_available_semaphores[FRAME_RESOURCES];
 	VkSemaphore render_finished_semaphores[FRAME_RESOURCES];
