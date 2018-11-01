@@ -3,15 +3,8 @@
 #include <vulkan/vulkan.h>
 #include "vulkan_base.h"
 
-struct vulkan_swapchain_shader {
-    long length;
-    char *bytes;
-};
-
 struct vulkan_swapchain {
     struct vulkan_base *base;
-    struct vulkan_swapchain_shader vert_shader;
-    struct vulkan_swapchain_shader frag_shader;
 
     VkSwapchainKHR swapchain;
     VkExtent2D extent;
@@ -19,10 +12,6 @@ struct vulkan_swapchain {
     uint32_t image_count;
     VkImage *images;
     VkImageView *imageviews;
-    VkRenderPass render_pass;
-    VkPipelineLayout pipeline_layout;
-    VkPipeline graphics_pipeline;
-    VkFramebuffer *framebuffers;
     VkCommandBuffer *command_buffers;
 };
 

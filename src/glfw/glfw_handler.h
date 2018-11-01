@@ -4,12 +4,14 @@
 #include "../vulkan/vulkan_base.h"
 #include "../vulkan/vulkan_swapchain.h"
 #include "../vulkan/vulkan_texture.h"
+#include "../vulkan/vulkan_pipeline.h"
 
 #define FRAME_RESOURCES 2
 
 struct glfw_handler {
 	struct vulkan_base vulkan_base;
-	struct vulkan_swapchain vulkan_swapchain;
+	struct vulkan_swapchain swapchain;
+	struct vulkan_pipeline pipeline;
 	struct vulkan_texture test_texture;
 	GLFWwindow *window;
 	VkSemaphore image_available_semaphores[FRAME_RESOURCES];
