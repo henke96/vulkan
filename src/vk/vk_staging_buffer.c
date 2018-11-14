@@ -1,16 +1,16 @@
-#include "vulkan_texture.h"
-#include "vulkan_base.h"
+#include "vk_staging_buffer.h"
+#include "vk_base.h"
 
-void *vulkan_texture__map(struct vulkan_texture *this) {
+void *vk_staging_buffer__map(struct vk_staging_buffer *this) {
     void *data;
     vkMapMemory(this->base->device, this->staging_buffer_memory, 0, this->size, 0, &data);
     return data;
 }
-void vulkan_texture__unmap(struct vulkan_texture *this) {
+void vk_staging_buffer__unmap(struct vk_staging_buffer *this) {
     vkUnmapMemory(this->base->device, this->staging_buffer_memory);
 }
 
-int vulkan_texture__try_init(struct vulkan_texture *this, struct vulkan_base *base, int width, int height) {
+int vk_staging_buffer__try_init(struct vk_staging_buffer *this, struct vk_base *base, int width, int height) {
     this->base = base;
     this->size = (VkDeviceSize) width*height*4;
 
@@ -58,7 +58,7 @@ int vulkan_texture__try_init(struct vulkan_texture *this, struct vulkan_base *ba
     return 0;
 }
 
-void vulkan_texture__free(struct vulkan_texture *this) {
+void vk_staging_buffer__free(struct vk_staging_buffer *this) {
     vkDestroyBuffer(this->base->device, this->staging_buffer, 0);
     vkFreeMemory(this->base->device, this->staging_buffer_memory, 0);
 }

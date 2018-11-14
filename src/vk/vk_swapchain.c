@@ -1,14 +1,14 @@
 #include <malloc.h>
-#include "vulkan_swapchain.h"
+#include "vk_swapchain.h"
 
 #define PREFERRED_IMAGE_COUNT 4
 
-static void free_swapchain(struct vulkan_swapchain *this) {
+static void free_swapchain(struct vk_swapchain *this) {
     vkDestroySwapchainKHR(this->base->device, this->swapchain, 0);
     free(this->images);
 }
 
-static void free_from_image_views(struct vulkan_swapchain *this) {
+static void free_from_image_views(struct vk_swapchain *this) {
     for (int i = 0; i < this->image_count; ++i) {
         vkDestroyImageView(this->base->device, this->imageviews[i], 0);
     }
@@ -16,7 +16,7 @@ static void free_from_image_views(struct vulkan_swapchain *this) {
     free_swapchain(this);
 }
 
-static void free_from_command_buffers(struct vulkan_swapchain *this) {
+static void free_from_command_buffers(struct vk_swapchain *this) {
     vkFreeCommandBuffers(this->base->device, this->base->command_pool, this->image_count, this->command_buffers);
     free(this->command_buffers);
     free_from_image_views(this);
@@ -28,7 +28,7 @@ struct try_query_swapchain {
     uint32_t best_image_count;
     VkSurfaceFormatKHR best_surface_format;
 }
-static try_query_swapchain(struct vulkan_swapchain *this) {
+static try_query_swapchain(struct vk_swapchain *this) {
     struct try_query_swapchain result;
 
     VkSurfaceCapabilitiesKHR capabilities;
@@ -85,7 +85,7 @@ static try_query_swapchain(struct vulkan_swapchain *this) {
     return result;
 }
 
-static int try_create_swapchain(struct vulkan_swapchain *this, int width, int height, VkImageUsageFlagBits image_usage) {
+static int try_create_swapchain(struct vk_swapchain *this, int width, int height, VkImageUsageFlagBits image_usage) {
     struct try_query_swapchain query = try_query_swapchain(this);
     if (query.result < 0) {
         return -1;
@@ -127,7 +127,7 @@ static int try_create_swapchain(struct vulkan_swapchain *this, int width, int he
     return 0;
 }
 
-static int try_create_image_views(struct vulkan_swapchain *this) {
+static int try_create_image_views(struct vk_swapchain *this) {
     this->imageviews = malloc(this->image_count*sizeof(*this->imageviews));
     if (!this->imageviews) {
         return -1;
@@ -159,7 +159,7 @@ static int try_create_image_views(struct vulkan_swapchain *this) {
     return 0;
 }
 
-static int try_create_command_buffers(struct vulkan_swapchain *this) {
+static int try_create_command_buffers(struct vk_swapchain *this) {
     this->command_buffers = malloc(this->image_count*sizeof(*this->command_buffers));
     if (!this->command_buffers) {
         return -1;
@@ -179,19 +179,19 @@ static int try_create_command_buffers(struct vulkan_swapchain *this) {
     return 0;
 }
 
-void vulkan_swapchain__free(struct vulkan_swapchain *this) {
+void vk_swapchain__free(struct vk_swapchain *this) {
 }
 
-int vulkan_swapchain__try_init(struct vulkan_swapchain *this, struct vulkan_base *base) {
+int vk_swapchain__try_init(struct vk_swapchain *this, struct vk_base *base) {
     this->base = base;
     return 0;
 }
 
-void vulkan_swapchain__free_swapchain(struct vulkan_swapchain *this) {
+void vk_swapchain__free_swapchain(struct vk_swapchain *this) {
     free_from_command_buffers(this);
 }
 
-int vulkan_swapchain__try_init_swapchain(struct vulkan_swapchain *this, int width, int height, VkImageUsageFlagBits image_usage) {
+int vk_swapchain__try_init_swapchain(struct vk_swapchain *this, int width, int height, VkImageUsageFlagBits image_usage) {
     int result;
     result = try_create_swapchain(this, width, height, image_usage);
     if (result < 0) {

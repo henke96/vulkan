@@ -9,7 +9,7 @@ set(CMAKE_C_FLAGS "-Wall -Wpedantic")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DVULKAN_BASE_VALIDATION")
 set(CMAKE_C_FLAGS_RELEASE "-O3")
 
-add_executable(vulkan_base src/main.c src/vulkan/vulkan_base.c src/vulkan/vulkan_base.h src/glfw/glfw_handler2.c src/glfw/glfw_handler2.h src/file/file.c src/file/file.h src/vulkan/vulkan_swapchain.c src/vulkan/vulkan_swapchain.h src/vulkan/vulkan_texture.c src/vulkan/vulkan_texture.h src/vulkan/vulkan_pipeline.c src/vulkan/vulkan_pipeline.h)
+add_executable(vulkan_base src/main.c src/vk/vk_base.c src/vk/vk_base.h src/glfw/glfw_handler.c src/glfw/glfw_handler.h src/file/file_util.c src/file/file_util.h src/vk/vk_swapchain.c src/vk/vk_swapchain.h src/vk/vk_staging_buffer.c src/vk/vk_staging_buffer.h src/vk/vk_pipeline.c src/vk/vk_pipeline.h src/vk/vk_staging_image.c src/vk/vk_staging_image.h src/vk/vk_command_buffer_util.c src/vk/vk_command_buffer_util.h)
 
 find_package(vulkan)
 message(STATUS "${Vulkan_LIBRARIES}")

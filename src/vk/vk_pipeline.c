@@ -1,20 +1,20 @@
 #include <malloc.h>
-#include "vulkan_pipeline.h"
-#include "../file/file.h"
+#include "vk_pipeline.h"
+#include "../file/file_util.h"
 
 #define PIPELINE_SAMPLES VK_SAMPLE_COUNT_1_BIT
 
-static void free_render_pass(struct vulkan_pipeline *this) {
+static void free_render_pass(struct vk_pipeline *this) {
     vkDestroyRenderPass(this->swapchain->base->device, this->render_pass, 0);
 }
 
-static void free_from_graphics_pipeline(struct vulkan_pipeline *this) {
+static void free_from_graphics_pipeline(struct vk_pipeline *this) {
     vkDestroyPipeline(this->swapchain->base->device, this->pipeline, 0);
     vkDestroyPipelineLayout(this->swapchain->base->device, this->pipeline_layout, 0);
     free_render_pass(this);
 }
 
-static void free_from_framebuffers(struct vulkan_pipeline *this) {
+static void free_from_framebuffers(struct vk_pipeline *this) {
     for (int i = 0; i < this->swapchain->image_count; ++i) {
         vkDestroyFramebuffer(this->swapchain->base->device, this->framebuffers[i], 0);
     }
@@ -22,7 +22,7 @@ static void free_from_framebuffers(struct vulkan_pipeline *this) {
     free_from_graphics_pipeline(this);
 }
 
-static int try_create_render_pass(struct vulkan_pipeline *this) {
+static int try_create_render_pass(struct vk_pipeline *this) {
     VkAttachmentDescription attachment_description;
     attachment_description.format = this->swapchain->surface_format.format;
     attachment_description.samples = PIPELINE_SAMPLES;
@@ -77,7 +77,7 @@ static int try_create_render_pass(struct vulkan_pipeline *this) {
     return 0;
 }
 
-static int try_create_shader_module(struct vulkan_pipeline *this, const char *code, long length, VkShaderModule *out_shader_module) {
+static int try_create_shader_module(struct vk_pipeline *this, const char *code, long length, VkShaderModule *out_shader_module) {
     VkShaderModuleCreateInfo create_info;
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     create_info.pNext = 0;
@@ -91,7 +91,7 @@ static int try_create_shader_module(struct vulkan_pipeline *this, const char *co
     return 0;
 }
 
-static int try_create_graphics_pipeline(struct vulkan_pipeline *this) {
+static int try_create_graphics_pipeline(struct vk_pipeline *this) {
     VkShaderModule vert_shader_module;
     if (try_create_shader_module(this, this->vert_shader.bytes, this->vert_shader.length, &vert_shader_module) < 0) {
         return -1;
@@ -260,7 +260,7 @@ static int try_create_graphics_pipeline(struct vulkan_pipeline *this) {
     return 0;
 }
 
-static int try_create_framebuffers(struct vulkan_pipeline *this) {
+static int try_create_framebuffers(struct vk_pipeline *this) {
     this->framebuffers = malloc(this->swapchain->image_count*sizeof(*this->framebuffers));
     if (!this->framebuffers) {
         return -1;
@@ -286,16 +286,16 @@ static int try_create_framebuffers(struct vulkan_pipeline *this) {
     return 0;
 }
 
-int vulkan_pipeline__try_init(struct vulkan_pipeline *this, struct vulkan_swapchain *swapchain) {
+int vk_pipeline__try_init(struct vk_pipeline *this, struct vk_swapchain *swapchain) {
     this->swapchain = swapchain;
 
-    struct file__try_read vert_read = file__try_read("shaders/vert.spv");
+    struct file_util__try_read vert_read = file_util__try_read("shaders/vert.spv");
     if (vert_read.result < 0) {
         return -1;
     }
     this->vert_shader.length = vert_read.length;
     this->vert_shader.bytes = vert_read.malloc_bytes;
-    struct file__try_read frag_read = file__try_read("shaders/frag.spv");
+    struct file_util__try_read frag_read = file_util__try_read("shaders/frag.spv");
     if (frag_read.result < 0) {
         free(vert_read.malloc_bytes);
         return -2;
@@ -305,12 +305,12 @@ int vulkan_pipeline__try_init(struct vulkan_pipeline *this, struct vulkan_swapch
     return 0;
 }
 
-void vulkan_pipeline__free(struct vulkan_pipeline *this) {
+void vk_pipeline__free(struct vk_pipeline *this) {
     free(this->vert_shader.bytes);
     free(this->frag_shader.bytes);
 }
 
-int vulkan_pipeline__try_init_pipeline(struct vulkan_pipeline *this) {
+int vk_pipeline__try_init_pipeline(struct vk_pipeline *this) {
     int result;
     result = try_create_render_pass(this);
     if (result < 0) {
@@ -331,6 +331,6 @@ int vulkan_pipeline__try_init_pipeline(struct vulkan_pipeline *this) {
     return 0;
 }
 
-void vulkan_pipeline__free_pipeline(struct vulkan_pipeline *this) {
+void vk_pipeline__free_pipeline(struct vk_pipeline *this) {
     free_from_framebuffers(this);
 }

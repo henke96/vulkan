@@ -16,17 +16,17 @@ static void free_glfw(struct glfw_handler *this) {
 
 static void free_semaphores_and_fences(struct glfw_handler *this) {
 	for (int i = 0; i < FRAME_RESOURCES; ++i) {
-		vkDestroySemaphore(this->vulkan_base.device, this->render_finished_semaphores[i], 0);
-		vkDestroySemaphore(this->vulkan_base.device, this->image_available_semaphores[i], 0);
-		vkDestroyFence(this->vulkan_base.device, this->resource_fences[i], 0);
+		vkDestroySemaphore(this->base.device, this->render_finished_semaphores[i], 0);
+		vkDestroySemaphore(this->base.device, this->image_available_semaphores[i], 0);
+		vkDestroyFence(this->base.device, this->resource_fences[i], 0);
 	}
 }
 
 static void free_semaphores_and_fences_below_index(struct glfw_handler *this, int i) {
 	for (--i;i >= 0; --i) {
-		vkDestroySemaphore(this->vulkan_base.device, this->render_finished_semaphores[i], 0);
-		vkDestroySemaphore(this->vulkan_base.device, this->image_available_semaphores[i], 0);
-		vkDestroyFence(this->vulkan_base.device, this->resource_fences[i], 0);
+		vkDestroySemaphore(this->base.device, this->render_finished_semaphores[i], 0);
+		vkDestroySemaphore(this->base.device, this->image_available_semaphores[i], 0);
+		vkDestroyFence(this->base.device, this->resource_fences[i], 0);
 	}
 }
 
@@ -42,20 +42,20 @@ static int create_semaphores_and_fences(struct glfw_handler *this) {
 	fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 	int i = 0;
 	for (; i < FRAME_RESOURCES; ++i) {
-		if (vkCreateSemaphore(this->vulkan_base.device, &semaphore_create_info, 0, this->image_available_semaphores + i) != VK_SUCCESS) {
+		if (vkCreateSemaphore(this->base.device, &semaphore_create_info, 0, this->image_available_semaphores + i) != VK_SUCCESS) {
             free_semaphores_and_fences_below_index(this, i);
 			return -1;
 		}
 
-		if (vkCreateSemaphore(this->vulkan_base.device, &semaphore_create_info, 0, this->render_finished_semaphores + i) != VK_SUCCESS) {
-			vkDestroySemaphore(this->vulkan_base.device, this->image_available_semaphores[i], 0);
+		if (vkCreateSemaphore(this->base.device, &semaphore_create_info, 0, this->render_finished_semaphores + i) != VK_SUCCESS) {
+			vkDestroySemaphore(this->base.device, this->image_available_semaphores[i], 0);
             free_semaphores_and_fences_below_index(this, i);
 			return -2;
 		}
 
-		if (vkCreateFence(this->vulkan_base.device, &fence_create_info, 0, this->resource_fences + i) != VK_SUCCESS) {
-			vkDestroySemaphore(this->vulkan_base.device, this->image_available_semaphores[i], 0);
-			vkDestroySemaphore(this->vulkan_base.device, this->render_finished_semaphores[i], 0);
+		if (vkCreateFence(this->base.device, &fence_create_info, 0, this->resource_fences + i) != VK_SUCCESS) {
+			vkDestroySemaphore(this->base.device, this->image_available_semaphores[i], 0);
+			vkDestroySemaphore(this->base.device, this->render_finished_semaphores[i], 0);
             free_semaphores_and_fences_below_index(this, i);
 			return -3;
 		}
@@ -74,7 +74,6 @@ static int try_record_command_buffers(struct glfw_handler *this) {
 		if (vkBeginCommandBuffer(this->swapchain.command_buffers[i], &command_begin_info) != VK_SUCCESS) {
 			return -1;
 		}
-
 		VkBufferImageCopy region;
         region.bufferOffset = 0;
         region.bufferRowLength = 0;
@@ -87,7 +86,7 @@ static int try_record_command_buffers(struct glfw_handler *this) {
         region.imageOffset = (VkOffset3D) {0, 0, 0};
         region.imageExtent = (VkExtent3D) {this->swapchain.extent.width, this->swapchain.extent.height, 1};
 
-		vkCmdCopyBufferToImage(this->swapchain.command_buffers[i], this->test_texture.staging_buffer, this->swapchain.images[i], VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 1, &region);
+		vkCmdCopyBufferToImage(this->swapchain.command_buffers[i], this->test_texture.staging_buffer, this->swapchain.images[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
 		if (vkEndCommandBuffer(this->swapchain.command_buffers[i]) != VK_SUCCESS) {
 			return -2;
@@ -107,10 +106,10 @@ static try_recreate_swapchain(struct glfw_handler *this) {
 		return TRY_RECREATE_SWAPCHAIN__NO_AREA;
 	}
 
-	vkDeviceWaitIdle(this->vulkan_base.device);
-	vulkan_swapchain__free_swapchain(&this->swapchain);
+	vkDeviceWaitIdle(this->base.device);
+    vk_swapchain__free_swapchain(&this->swapchain);
 
-	if (vulkan_swapchain__try_init_swapchain(&this->swapchain, width, height, VK_IMAGE_USAGE_TRANSFER_DST_BIT) < 0) {
+	if (vk_swapchain__try_init_swapchain(&this->swapchain, width, height, VK_IMAGE_USAGE_TRANSFER_DST_BIT) < 0) {
 		return -1;
 	}
 
@@ -129,15 +128,15 @@ static int draw_frame(struct glfw_handler *this, uint32_t *data) {
 
 
 	for (int i = 0; i < this->test_texture.size/4; ++i) {
-		data[i] = (255 << 24) | (omg1 << 16) | (omg2 << 8) | omg3;
+		//data[i] = (omg1 << 16) | (omg2 << 8) | omg3;
 	}
 
-	vkWaitForFences(this->vulkan_base.device, 1, this->resource_fences + this->resources_index, VK_TRUE, MAX_UINT64);
-	vkResetFences(this->vulkan_base.device, 1, this->resource_fences + this->resources_index);
+	vkWaitForFences(this->base.device, 1, this->resource_fences + this->resources_index, VK_TRUE, MAX_UINT64);
+	vkResetFences(this->base.device, 1, this->resource_fences + this->resources_index);
 
 	uint32_t image_index;
 	while (1) {
-		VkResult vk_result = vkAcquireNextImageKHR(this->vulkan_base.device, this->swapchain.swapchain, MAX_UINT64,
+		VkResult vk_result = vkAcquireNextImageKHR(this->base.device, this->swapchain.swapchain, MAX_UINT64,
 												this->image_available_semaphores[this->resources_index], VK_NULL_HANDLE,
 												&image_index);
 
@@ -154,7 +153,7 @@ static int draw_frame(struct glfw_handler *this, uint32_t *data) {
 			return -2;
 		}
 	}
-	VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;//VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 
 	VkSubmitInfo submit_info;
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -167,7 +166,7 @@ static int draw_frame(struct glfw_handler *this, uint32_t *data) {
 	submit_info.signalSemaphoreCount = 1;
 	submit_info.pSignalSemaphores = this->render_finished_semaphores + this->resources_index;
 
-	if (vkQueueSubmit(this->vulkan_base.queue, 1, &submit_info, this->resource_fences[this->resources_index]) != VK_SUCCESS) {
+	if (vkQueueSubmit(this->base.queue, 1, &submit_info, this->resource_fences[this->resources_index]) != VK_SUCCESS) {
 		return -3;
 	}
 
@@ -181,7 +180,7 @@ static int draw_frame(struct glfw_handler *this, uint32_t *data) {
 	present_info.swapchainCount = 1;
 	present_info.pSwapchains = &this->swapchain.swapchain;
 
-	VkResult vk_result = vkQueuePresentKHR(this->vulkan_base.queue, &present_info);
+	VkResult vk_result = vkQueuePresentKHR(this->base.queue, &present_info);
 	if (vk_result != VK_SUCCESS) {
 		if (vk_result == VK_SUBOPTIMAL_KHR || vk_result == VK_ERROR_OUT_OF_DATE_KHR) {
 			int result = try_recreate_swapchain(this);
@@ -200,14 +199,14 @@ static void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 	this->should_recreate_swapchain = 1;
 }
 
-int glfw_handler__try_init(struct glfw_handler *this, int width, int height, char *title, int fullscreen) {
+int glfw_handler__try_init(struct glfw_handler *this, int width, int height, char *title, int is_fullscreen) {
 	this->resources_index = 0;
 	glfwInit();
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
 	GLFWmonitor *monitor = NULL;
-	if (fullscreen) {
+	if (is_fullscreen) {
 		monitor = glfwGetPrimaryMonitor();
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 	} else {
@@ -219,69 +218,69 @@ int glfw_handler__try_init(struct glfw_handler *this, int width, int height, cha
 
 	uint32_t extension_count;
 	const char **extensions = glfwGetRequiredInstanceExtensions(&extension_count);
-	struct vulkan_base__create_surface callback;
+	struct vk_base__create_surface callback;
 	callback.create_window_surface = create_window_surface;
 	callback.user_data = this;
-	int result = vulkan_base__try_init(&this->vulkan_base, extensions, extension_count, callback);
+	int result = vk_base__try_init(&this->base, extensions, extension_count, callback);
 	if (result < 0) {
 		free_glfw(this);
 		return -1;
 	}
 
-	result = vulkan_swapchain__try_init(&this->swapchain, &this->vulkan_base);
+	result = vk_swapchain__try_init(&this->swapchain, &this->base);
 	if (result < 0) {
-		vulkan_base__free(&this->vulkan_base);
+        vk_base__free(&this->base);
 		free_glfw(this);
 		return -2;
 	}
 
-	result = vulkan_swapchain__try_init_swapchain(&this->swapchain, width, height, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+	result = vk_swapchain__try_init_swapchain(&this->swapchain, width, height, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 	if (result < 0) {
-		vulkan_swapchain__free(&this->swapchain);
-	    vulkan_base__free(&this->vulkan_base);
+        vk_swapchain__free(&this->swapchain);
+        vk_base__free(&this->base);
 	    free_glfw(this);
 	    return -3;
 	}
 
 	result = create_semaphores_and_fences(this);
 	if (result < 0) {
-		vulkan_swapchain__free_swapchain(&this->swapchain);
-		vulkan_swapchain__free(&this->swapchain);
-		vulkan_base__free(&this->vulkan_base);
+        vk_swapchain__free_swapchain(&this->swapchain);
+        vk_swapchain__free(&this->swapchain);
+        vk_base__free(&this->base);
 		free_glfw(this);
 		return -4;
 	}
-	vkDeviceWaitIdle(this->vulkan_base.device);
-	result = vulkan_texture__try_init(&this->test_texture, &this->vulkan_base, width, height);
+	vkDeviceWaitIdle(this->base.device);
+	result = vk_staging_buffer__try_init(&this->test_texture, &this->base, width, height);
 	if (result < 0) {
         free_semaphores_and_fences(this);
-        vulkan_swapchain__free_swapchain(&this->swapchain);
-        vulkan_swapchain__free(&this->swapchain);
-        vulkan_base__free(&this->vulkan_base);
+        vk_swapchain__free_swapchain(&this->swapchain);
+        vk_swapchain__free(&this->swapchain);
+        vk_base__free(&this->base);
         free_glfw(this);
 	}
 
 	//TODO lol
-	uint32_t *data = vulkan_texture__map(&this->test_texture);
+	uint32_t *data = vk_staging_buffer__map(&this->test_texture);
 	for (int i = 0; i < this->test_texture.size/4; ++i) {
 		data[i] = (100 << 24) | (100 << 16) | (100 << 8) | (100 << 0);
 	}
-	vulkan_texture__unmap(&this->test_texture);
-	vkDeviceWaitIdle(this->vulkan_base.device);
+	vk_staging_buffer__unmap(&this->test_texture);
+	vkDeviceWaitIdle(this->base.device);
 	return 0;
 }
 
 void glfw_handler__free(struct glfw_handler *this) {
-    vulkan_texture__free(&this->test_texture);
+    vk_staging_buffer__free(&this->test_texture);
     free_semaphores_and_fences(this);
-    vulkan_swapchain__free_swapchain(&this->swapchain);
-    vulkan_swapchain__free(&this->swapchain);
-    vulkan_base__free(&this->vulkan_base);
+    vk_swapchain__free_swapchain(&this->swapchain);
+    vk_swapchain__free(&this->swapchain);
+    vk_base__free(&this->base);
     free_glfw(this);
 }
 
 int glfw_handler__try_run(struct glfw_handler *this) {
-	uint32_t *data = vulkan_texture__map(&this->test_texture);
+	uint32_t *data = vk_staging_buffer__map(&this->test_texture);
 	if (try_record_command_buffers(this) < 0) {
 		return -1;
 	}
@@ -312,7 +311,7 @@ int glfw_handler__try_run(struct glfw_handler *this) {
 			return -3;
 		}
 	}
-	vulkan_texture__unmap(&this->test_texture);
-	vkDeviceWaitIdle(this->vulkan_base.device);
+	vk_staging_buffer__unmap(&this->test_texture);
+	vkDeviceWaitIdle(this->base.device);
 	return 0;
 }

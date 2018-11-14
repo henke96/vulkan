@@ -1,48 +1,48 @@
-#include "vulkan_base.h"
-#include "../file/file.h"
+#include "vk_base.h"
+#include "../file/file_util.h"
 #include <malloc.h>
 #include <stdio.h>
 
-static void free_instance(struct vulkan_base *this) {
+static void free_instance(struct vk_base *this) {
 	vkDestroyInstance(this->instance, 0);
 }
 
-#ifdef VULKAN_BASE_VALIDATION
-static void free_debug_callback_to_instance(struct vulkan_base *this) {
+#ifdef BASE_VALIDATION
+static void free_debug_callback_to_instance(struct vk_base *this) {
 	PFN_vkDestroyDebugUtilsMessengerEXT func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(this->instance, "vkDestroyDebugUtilsMessengerEXT");
 	func(this->instance, this->callback, 0);
 	free_instance(this);
 }
 #endif
 
-static void free_from_window_surface(struct vulkan_base *this) {
+static void free_from_window_surface(struct vk_base *this) {
 	vkDestroySurfaceKHR(this->instance, this->surface, 0);
-#ifdef VULKAN_BASE_VALIDATION
+#ifdef BASE_VALIDATION
 	free_debug_callback_to_instance(this);
 #else
     free_instance(this);
 #endif
 }
 
-static void free_from_device(struct vulkan_base *this) {
+static void free_from_device(struct vk_base *this) {
 	vkDestroyDevice(this->device, 0);
     free_from_window_surface(this);
 }
 
-static void free_from_command_pool(struct vulkan_base *this) {
+static void free_from_command_pool(struct vk_base *this) {
     vkDestroyCommandPool(this->device, this->command_pool, 0);
 	free_from_device(this);
 }
 
-void vulkan_base__free(struct vulkan_base *this) {
+void vk_base__free(struct vk_base *this) {
 	free_from_command_pool(this);
 }
 
-static int try_create_instance(struct vulkan_base *this, const char **extensions, int extension_count) {
+static int try_create_instance(struct vk_base *this, const char **extensions, int extension_count) {
 	VkInstanceCreateInfo create_info;
 	create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	create_info.pApplicationInfo = 0;
-#ifdef VULKAN_BASE_VALIDATION
+#ifdef BASE_VALIDATION
 	const char *new_extensions[extension_count + 1];
 	int i = 0;
 	for (; i < extension_count; ++i) {
@@ -70,7 +70,7 @@ static int try_create_instance(struct vulkan_base *this, const char **extensions
 	return 0;
 }
 
-#ifdef VULKAN_BASE_VALIDATION
+#ifdef BASE_VALIDATION
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 		VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -82,7 +82,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 }
 #endif
 
-static int try_create_device(struct vulkan_base *this) {
+static int try_create_device(struct vk_base *this) {
 	this->queue_family_index = -1;
 	uint32_t device_count;
 	vkEnumeratePhysicalDevices(this->instance, &device_count, 0);
@@ -136,7 +136,7 @@ static int try_create_device(struct vulkan_base *this) {
 	device_create_info.ppEnabledExtensionNames = device_extensions;
 	device_create_info.flags = 0;
 	device_create_info.pNext = 0;
-#ifdef VULKAN_BASE_VALIDATION
+#ifdef BASE_VALIDATION
 	const char *validation_layers[1] = { "VK_LAYER_LUNARG_standard_validation" };
 	device_create_info.enabledLayerCount = 1;
 	device_create_info.ppEnabledLayerNames = validation_layers;
@@ -152,7 +152,7 @@ static int try_create_device(struct vulkan_base *this) {
 	return 0;
 }
 
-static int try_create_command_pool(struct vulkan_base *this) {
+static int try_create_command_pool(struct vk_base *this) {
 	VkCommandPoolCreateInfo create_info;
 	create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	create_info.pNext = 0;
@@ -165,13 +165,14 @@ static int try_create_command_pool(struct vulkan_base *this) {
 	return 0;
 }
 
-int vulkan_base__try_init(struct vulkan_base *this, const char **extensions, int extension_count, struct vulkan_base__create_surface callback) {
+int vk_base__try_init(struct vk_base *this, const char **extensions, int extension_count,
+					  struct vk_base__create_surface callback) {
 	int result;
 	result = try_create_instance(this, extensions, extension_count);
 	if (result < 0) {
 		return -1;
 	}
-#ifdef VULKAN_BASE_VALIDATION
+#ifdef BASE_VALIDATION
 	VkDebugUtilsMessengerCreateInfoEXT create_info;
 	create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
 	create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
@@ -188,7 +189,7 @@ int vulkan_base__try_init(struct vulkan_base *this, const char **extensions, int
 	}
 #endif
 	if (callback.create_window_surface(callback.user_data, this->instance, &this->surface) != VK_SUCCESS) {
-#ifdef VULKAN_BASE_VALIDATION
+#ifdef BASE_VALIDATION
 		free_debug_callback_to_instance(this);
 #else
         free_instance(this);
