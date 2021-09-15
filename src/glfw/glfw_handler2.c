@@ -128,7 +128,7 @@ static int draw_frame(struct glfw_handler *this, uint32_t *data) {
 
 
 	for (int i = 0; i < this->test_texture.size/4; ++i) {
-		//data[i] = (omg1 << 16) | (omg2 << 8) | omg3;
+		data[i] = (omg1 << 16) | (omg2 << 8) | omg3;
 	}
 
 	vkWaitForFences(this->base.device, 1, this->resource_fences + this->resources_index, VK_TRUE, MAX_UINT64);
@@ -196,6 +196,7 @@ static int draw_frame(struct glfw_handler *this, uint32_t *data) {
 
 static void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
 	struct glfw_handler *this = glfwGetWindowUserPointer(window);
+	printf("Size callback %d %d\n", width, height);
 	this->should_recreate_swapchain = 1;
 }
 

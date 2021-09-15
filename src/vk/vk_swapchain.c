@@ -34,8 +34,10 @@ static try_query_swapchain(struct vk_swapchain *this) {
     VkSurfaceCapabilitiesKHR capabilities;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(this->base->physical_device, this->base->surface, &capabilities);
 
-    if (capabilities.maxImageCount < PREFERRED_IMAGE_COUNT) {
+    if (capabilities.maxImageCount > 0 && capabilities.maxImageCount < PREFERRED_IMAGE_COUNT) {
         result.best_image_count = capabilities.maxImageCount;
+    } else if (capabilities.minImageCount > PREFERRED_IMAGE_COUNT) {
+        result.best_image_count = capabilities.minImageCount;
     } else {
         result.best_image_count = PREFERRED_IMAGE_COUNT;
     }
@@ -75,6 +77,7 @@ static try_query_swapchain(struct vk_swapchain *this) {
             VkSurfaceFormatKHR surface_format = surface_formats[i];
             if (surface_format.format == VK_FORMAT_B8G8R8A8_UNORM && surface_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
                 result.best_surface_format = surface_format;
+                printf("Found nice format\n");
                 goto surface_format_found;
             }
         }
@@ -86,6 +89,7 @@ static try_query_swapchain(struct vk_swapchain *this) {
 }
 
 static int try_create_swapchain(struct vk_swapchain *this, int width, int height, VkImageUsageFlagBits image_usage) {
+    printf("Create swapchain\n");
     struct try_query_swapchain query = try_query_swapchain(this);
     if (query.result < 0) {
         return -1;

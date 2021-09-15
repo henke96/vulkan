@@ -52,7 +52,7 @@ static int try_create_instance(struct vk_base *this, const char **extensions, in
 	create_info.enabledExtensionCount = (uint32_t) extension_count + 1;
 	create_info.ppEnabledExtensionNames = new_extensions;
 
-	const char *validation_layers[1] = {"VK_LAYER_LUNARG_standard_validation"};
+	const char *validation_layers[1] = {"VK_LAYER_KHRONOS_validation"};
 	create_info.enabledLayerCount = 1;
 	create_info.ppEnabledLayerNames = validation_layers;
 #else
@@ -137,14 +137,13 @@ static int try_create_device(struct vk_base *this) {
 	device_create_info.flags = 0;
 	device_create_info.pNext = 0;
 #ifdef BASE_VALIDATION
-	const char *validation_layers[1] = { "VK_LAYER_LUNARG_standard_validation" };
+	const char *validation_layers[1] = { "VK_LAYER_KHRONOS_validation" };
 	device_create_info.enabledLayerCount = 1;
 	device_create_info.ppEnabledLayerNames = validation_layers;
 #else
 	device_create_info.enabledLayerCount = 0;
 	device_create_info.ppEnabledLayerNames = 0;
 #endif
-
 	if (vkCreateDevice(this->physical_device, &device_create_info, 0, &this->device) != VK_SUCCESS) {
 		return -2;
 	}
