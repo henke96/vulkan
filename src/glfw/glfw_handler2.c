@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "glfw_handler2.h"
+#include <unistd.h>
 
 #define MAX_UINT64 0xFFFFFFFFFFFFFFFF
 
@@ -74,6 +75,25 @@ static int try_record_command_buffers(struct glfw_handler *this) {
 		if (vkBeginCommandBuffer(this->swapchain.command_buffers[i], &command_begin_info) != VK_SUCCESS) {
 			return -1;
 		}
+
+		VkImageMemoryBarrier barrier1;
+		barrier1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier1.pNext = 0;
+		barrier1.srcAccessMask = 0;
+		barrier1.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier1.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		barrier1.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		barrier1.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier1.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier1.image = this->swapchain.images[i];
+		barrier1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier1.subresourceRange.baseMipLevel = 0;
+		barrier1.subresourceRange.levelCount = 1;
+		barrier1.subresourceRange.baseArrayLayer = 0;
+		barrier1.subresourceRange.layerCount = 1;
+
+		vkCmdPipelineBarrier(this->swapchain.command_buffers[i], VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, 0, 0, 0, 1, &barrier1);
+
 		VkBufferImageCopy region;
         region.bufferOffset = 0;
         region.bufferRowLength = 0;
@@ -87,6 +107,24 @@ static int try_record_command_buffers(struct glfw_handler *this) {
         region.imageExtent = (VkExtent3D) {this->swapchain.extent.width, this->swapchain.extent.height, 1};
 
 		vkCmdCopyBufferToImage(this->swapchain.command_buffers[i], this->test_texture.staging_buffer, this->swapchain.images[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+		VkImageMemoryBarrier barrier2;
+		barrier2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier2.pNext = 0;
+		barrier2.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier2.dstAccessMask = 0; // TODO: is this right?
+		barrier2.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		barrier2.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		barrier2.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier2.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier2.image = this->swapchain.images[i];
+		barrier2.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier2.subresourceRange.baseMipLevel = 0;
+		barrier2.subresourceRange.levelCount = 1;
+		barrier2.subresourceRange.baseArrayLayer = 0;
+		barrier2.subresourceRange.layerCount = 1;
+
+		vkCmdPipelineBarrier(this->swapchain.command_buffers[i], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, 0, 0, 0, 1, &barrier2);
 
 		if (vkEndCommandBuffer(this->swapchain.command_buffers[i]) != VK_SUCCESS) {
 			return -2;
